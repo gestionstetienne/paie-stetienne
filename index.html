@@ -770,27 +770,42 @@ function ck(pi,en) { return `p${pi}_${en}`; }
 
 async function loadEmpPeriod(pi, empName) {
   const k = ck(pi, empName);
-  if (_cache[k]) return _cache[k];
+  if (_cache[k] && Object.keys(_cache[k]).length > 0) return _cache[k];
+
+  // Essayer localStorage d'abord (données saisies localement)
+  try {
+    const local = JSON.parse(localStorage.getItem(`paie_${k}`));
+    if (local && Object.keys(local).length > 0) {
+      _cache[k] = local;
+    }
+  } catch(e) {}
+
+  // Essayer Supabase (données partagées)
   try {
     setSync('Chargement…');
     const rows = await sbFetch(`saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&order=day_index,seg_index`);
-    const data = {};
-    rows.forEach(r => {
-      if (!data[r.day_index]) data[r.day_index] = [];
-      while (data[r.day_index].length <= r.seg_index)
-        data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:''});
-      data[r.day_index][r.seg_index] = {
-        entree:r.entree||'', sortie:r.sortie||'',
-        pause:String(r.pause||0), dentist:r.dentist||'',
-        is2eSoir:r.is_2e_soir||false
-      };
-    });
-    _cache[k] = data; setSync('');
-    return data;
+    if (rows.length > 0) {
+      const data = {};
+      rows.forEach(r => {
+        if (!data[r.day_index]) data[r.day_index] = [];
+        while (data[r.day_index].length <= r.seg_index)
+          data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
+        data[r.day_index][r.seg_index] = {
+          entree:r.entree||'', sortie:r.sortie||'',
+          pause:String(r.pause||0), dentist:r.dentist||'',
+          is2eSoir:r.is_2e_soir||false
+        };
+      });
+      _cache[k] = data;
+      // Sync vers localStorage
+      try { localStorage.setItem(`paie_${k}`, JSON.stringify(data)); } catch(e) {}
+    }
+    setSync('');
   } catch(e) {
-    console.error(e); setSync('⚠ Hors ligne');
-    try { return JSON.parse(localStorage.getItem(`paie_${k}`))||{}; } catch { return {}; }
+    console.error('loadEmpPeriod:', e);
+    setSync('⚠ Hors ligne');
   }
+  return _cache[k] || {};
 }
 
 function getEmpDaySegs(pi, empName, di) {
@@ -1411,13 +1426,24 @@ async function showApercu() {
   if(!currentEmployee)return;
   const p=getPeriod(currentPeriodIndex);
 
-  // Charger toute la période — forcer rechargement du cache
   showLoadingOverlay('Préparation de l\'aperçu…');
-  // Vider le cache de l'employée courante pour forcer rechargement depuis Supabase
-  delete _cache[ck(currentPeriodIndex, currentEmployee)];
-  await loadEmpPeriod(currentPeriodIndex, currentEmployee);
+
+  // Charger depuis Supabase
   await loadAllPeriod(currentPeriodIndex);
   if(currentPeriodIndex>0) await loadAllPeriod(currentPeriodIndex-1);
+
+  // Si le cache est vide pour l'employée courante, lire depuis localStorage
+  const ck_cur = ck(currentPeriodIndex, currentEmployee);
+  if (!_cache[ck_cur] || Object.keys(_cache[ck_cur]).length === 0) {
+    try {
+      const local = JSON.parse(localStorage.getItem(`paie_${ck_cur}`));
+      if (local) {
+        _cache[ck_cur] = local;
+        console.log('Aperçu: fallback vers localStorage pour', currentEmployee);
+      }
+    } catch(e) {}
+  }
+
   hideLoadingOverlay();
 
   // Section 1 — Erreurs (validation + chevauchements)
