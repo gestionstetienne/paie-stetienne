@@ -781,7 +781,8 @@ async function loadEmpPeriod(pi, empName) {
         data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:''});
       data[r.day_index][r.seg_index] = {
         entree:r.entree||'', sortie:r.sortie||'',
-        pause:String(r.pause||0), dentist:r.dentist||''
+        pause:String(r.pause||0), dentist:r.dentist||'',
+        is2eSoir:r.is_2e_soir||false
       };
     });
     _cache[k] = data; setSync('');
@@ -815,7 +816,8 @@ async function syncDay(pi, empName, di, segs) {
       const rows = segs.map((s,si) => ({
         periode_index:pi, emp_name:empName, day_index:di, seg_index:si,
         entree:s.entree||null, sortie:s.sortie||null, pause:parseInt(s.pause)||0,
-        dentist:s.dentist||null, updated_at:new Date().toISOString()
+        dentist:s.dentist||null, is_2e_soir:s.is2eSoir||false,
+        updated_at:new Date().toISOString()
       }));
       await sbFetch('saisies', { method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(rows) });
       if (segs.length < 10)
@@ -834,9 +836,9 @@ async function loadAllPeriod(pi) {
       if (!byEmp[r.emp_name]) byEmp[r.emp_name] = {};
       if (!byEmp[r.emp_name][r.day_index]) byEmp[r.emp_name][r.day_index] = [];
       while (byEmp[r.emp_name][r.day_index].length <= r.seg_index)
-        byEmp[r.emp_name][r.day_index].push({entree:'',sortie:'',pause:'0',dentist:''});
+        byEmp[r.emp_name][r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
       byEmp[r.emp_name][r.day_index][r.seg_index] = {
-        entree:r.entree||'',sortie:r.sortie||'',pause:String(r.pause||0),dentist:r.dentist||''
+        entree:r.entree||'',sortie:r.sortie||'',pause:String(r.pause||0),dentist:r.dentist||'',is2eSoir:r.is_2e_soir||false
       };
     });
     Object.entries(byEmp).forEach(([n,d]) => { _cache[ck(pi,n)] = d; });
