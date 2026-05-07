@@ -650,7 +650,7 @@ optgroup { font-weight:700; font-style:normal; }
 //  SUPABASE
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://jurtntqtitbefdvyetyz.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_xFzN8HY7y0hFrXjwGschRw_B4TxLUxq';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1cnRudHF0aXRiZWZkdnlldHl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNjk2MDUsImV4cCI6MjA5MzY0NTYwNX0.Lt2HlYD5VyfB6aM_T5IpoFAWwB4r62Q2ZQ8PKxMJlIY';
 const RESEND_KEY   = 're_BvmzJrTS_Gv4YwLkyh6wMTPsWJo7amSUf';
 
 async function sbFetch(path, opts = {}) {
@@ -1411,8 +1411,11 @@ async function showApercu() {
   if(!currentEmployee)return;
   const p=getPeriod(currentPeriodIndex);
 
-  // Charger toute la période pour la comparaison
+  // Charger toute la période — forcer rechargement du cache
   showLoadingOverlay('Préparation de l\'aperçu…');
+  // Vider le cache de l'employée courante pour forcer rechargement depuis Supabase
+  delete _cache[ck(currentPeriodIndex, currentEmployee)];
+  await loadEmpPeriod(currentPeriodIndex, currentEmployee);
   await loadAllPeriod(currentPeriodIndex);
   if(currentPeriodIndex>0) await loadAllPeriod(currentPeriodIndex-1);
   hideLoadingOverlay();
