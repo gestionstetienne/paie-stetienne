@@ -350,10 +350,11 @@ optgroup { font-weight:700; font-style:normal; }
           <option value="">— Sélectionnez votre nom —</option>
         </select>
       </div>
-      <div class="login-field" id="loginEmailField">
+      <div class="login-field" id="loginEmailField" style="display:none">
         <label>Votre adresse courriel</label>
         <input type="email" id="loginEmail" placeholder="prenom@exemple.com"
           oninput="onLoginInput()" onkeydown="if(event.key==='Enter')doLogin()">
+        <p id="loginEmailHint" style="font-size:11px;color:var(--muted);margin-top:5px"></p>
       </div>
       <div class="login-err" id="loginErr"></div>
       <button class="login-btn" id="loginBtn" onclick="doLogin()" disabled>
@@ -429,6 +430,8 @@ optgroup { font-weight:700; font-style:normal; }
       <p id="lockedMsg">Cette période a déjà été envoyée.</p>
     </div>
   </div>
+
+
 
   <!-- Days -->
   <div id="daysGrid"></div>
@@ -564,6 +567,26 @@ optgroup { font-weight:700; font-style:normal; }
           <div id="emailList" style="font-size:12px;"></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Conflit modal -->
+<div class="modal-bg" id="conflictModal">
+  <div class="modal" style="max-width:520px">
+    <h2 style="color:var(--err)">🚫 Envoi bloqué — Conflits d'horaire</h2>
+    <p>L'envoi est impossible tant que les conflits suivants ne sont pas corrigés. Contactez les employées concernées.</p>
+    <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:16px;max-height:300px;overflow-y:auto">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--err);margin-bottom:8px">
+        ⚠ Conflits détectés
+      </div>
+      <div id="conflictList"></div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
+      Chaque employée concernée doit corriger ses horaires dans l'application avant que l'envoi soit possible.
+    </p>
+    <div class="modal-btns">
+      <button class="btn btn-sec" onclick="closeConflictModal()">Fermer</button>
     </div>
   </div>
 </div>
@@ -844,11 +867,14 @@ function setSync(msg, brief=false) {
 // ═══════════════════════════════════════════════════════════════
 //  LOGIN / LOGOUT
 // ═══════════════════════════════════════════════════════════════
+
+
 function populateLoginSelector() {
   const sel = document.getElementById('loginName');
   sel.innerHTML = '<option value="">— Sélectionnez votre nom —</option>';
   const cats = ['Administration','Assistante','Hygiéniste'];
   cats.forEach(cat => {
+    // Afficher seulement les noms de base (sans "2e soir")
     const group = employees.filter(e => e.cat===cat && !e.name.includes('2e soir'));
     if (!group.length) return;
     const og = document.createElement('optgroup');
@@ -863,10 +889,36 @@ function populateLoginSelector() {
 
 function onLoginNameChange() {
   const name = document.getElementById('loginName').value;
-  if (!name) { document.getElementById('loginBtn').disabled = true; return; }
-  // Pre-fill email if known
+  const emailField = document.getElementById('loginEmailField');
+  const emailInput = document.getElementById('loginEmail');
+  const emailHint  = document.getElementById('loginEmailHint');
+
+  if (!name) {
+    document.getElementById('loginBtn').disabled = true;
+    emailField.style.display = 'none';
+    return;
+  }
+
   const emp = employees.find(e => e.name === name);
-  if (emp?.email) document.getElementById('loginEmail').value = emp.email;
+  const knownEmail = emp?.email || '';
+
+  if (knownEmail) {
+    // Courriel déjà connu — pré-remplir et masquer le champ (lecture seule)
+    emailInput.value = knownEmail;
+    emailField.style.display = 'block';
+    if (emailHint) emailHint.textContent = `✓ Courriel associé : ${knownEmail}`;
+    emailInput.style.background = '#F0F7FF';
+    emailInput.style.color = '#1C3557';
+    emailInput.readOnly = true;
+  } else {
+    // Première connexion — afficher le champ vide
+    emailInput.value = '';
+    emailInput.readOnly = false;
+    emailInput.style.background = '';
+    emailInput.style.color = '';
+    emailField.style.display = 'block';
+    if (emailHint) emailHint.textContent = 'Première connexion — votre courriel sera mémorisé pour les rappels.';
+  }
   onLoginInput();
 }
 
@@ -881,7 +933,6 @@ async function doLogin() {
   const name  = document.getElementById('loginName').value;
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   if (!name || !email) return;
-
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = 'Connexion…';
 
@@ -893,35 +944,28 @@ async function doLogin() {
       btn.disabled = false; btn.textContent = 'Connexion →'; return;
     }
     if (!emp.email) {
-      // Première connexion — enregistrer le courriel
       emp.email = email; saveConfig();
-      // Enregistrer dans Supabase aussi
       try {
         await sbFetch('employe_emails', {
           method:'POST', prefer:'resolution=merge-duplicates',
           body: JSON.stringify({ emp_name: name, email })
         });
-      } catch(e) { console.warn('Could not save email to DB:', e); }
+      } catch(e) { console.warn('Could not save email:', e); }
     }
   }
 
-  // Enregistrer la session
-  localStorage.setItem('session_name',  name);
-  localStorage.setItem('session_email', email);
+  // Session — toujours le nom de base (pas de 2e soir à la connexion)
   currentEmployee  = name;
   currentUserEmail = email;
-  isAdmin = (email === ADMIN_EMAIL);
-
+  isAdmin = email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
   showApp();
 }
 
 function doLogout() {
-  localStorage.removeItem('session_name');
-  localStorage.removeItem('session_email');
   currentEmployee = ''; currentUserEmail = ''; isAdmin = false;
-  document.getElementById('loginErr').style.display='none';
   document.getElementById('loginEmail').value='';
   document.getElementById('loginName').value='';
+  document.getElementById('loginErr').style.display='none';
   document.getElementById('loginBtn').disabled=true;
   document.getElementById('loginBtn').textContent='Connexion →';
   document.getElementById('appPage').style.display='none';
@@ -959,6 +1003,12 @@ async function showApp() {
   await loadEmpPeriod(currentPeriodIndex, currentEmployee);
   if (currentPeriodIndex > 0)
     await loadEmpPeriod(currentPeriodIndex-1, currentEmployee);
+
+  // Pour les variantes 2e soir, charger aussi les données de la même période
+  const base = currentEmployee.replace(' 2e soir','').trim();
+  if (base !== currentEmployee) {
+    await loadEmpPeriod(currentPeriodIndex, base);
+  }
   hideLoadingOverlay();
 
   renderDays();
@@ -1047,6 +1097,7 @@ function updateClock() {
 // ═══════════════════════════════════════════════════════════════
 function renderDays() {
   if(!currentEmployee) return;
+  
   const p=getPeriod(currentPeriodIndex), locked=isLocked(currentPeriodIndex)||isSent(currentPeriodIndex);
   const grid=document.getElementById('daysGrid'); grid.innerHTML='';
   const lb=document.getElementById('lockedBanner'), si=getSentInfo(currentPeriodIndex);
@@ -1058,6 +1109,7 @@ function renderDays() {
 }
 
 function buildDayCard(dayIdx,dateObj,locked) {
+  
   const dayName=DAYS_FR[dayIdx%5], w=dayIdx<5?1:2;
   const today=new Date(); today.setHours(0,0,0,0);
   const isToday=dateObj.getTime()===today.getTime();
@@ -1095,7 +1147,7 @@ function toggleDay(i,forceOpen) {
 // ── SEGMENTS ──
 function renderSegs(dayIdx,locked) {
   const con=document.getElementById(`segs_${dayIdx}`); if(!con)return;
-  const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
+   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
   if(!segs.length){con.innerHTML='<p style="font-size:12px;color:var(--light);font-style:italic;padding:4px 0">Aucune entrée.</p>';return;}
   con.innerHTML=''; segs.forEach((seg,si)=>con.appendChild(buildSegEl(dayIdx,si,seg,locked)));
 }
@@ -1104,16 +1156,49 @@ function buildSegEl(dayIdx,si,seg,locked) {
   const v=validate(seg), div=document.createElement('div');
   div.className=`seg ${v.valid?'valid':v.error?'error':''}`;
   div.id=`seg_${dayIdx}_${si}`;
+
+  // Determine effective employee name for this segment
+  const isSeg2eSoir = seg.is2eSoir || false;
+  const base = currentEmployee.replace(' 2e soir','').trim();
+  // Toujours afficher le toggle 2e soir (ne pas dépendre de la liste employees)
+
   const dk=seg.dentist||'', dobj=dentists.find(d=>d.key===dk);
   const pillStyle=dobj?`style="background:${dobj.color}"`:'style="background:#9BAABF"';
   const pillLabel=dobj?dobj.short:'Aucune';
   const opts=dentists.map(d=>`<option value="${d.key}" ${d.key===dk?'selected':''}>${d.full||d.short}</option>`).join('');
+
+  // 2e soir toggle — toujours visible dans chaque segment
+  const soirHtml = !locked ? `
+    <div class="field">
+      <label>Type de quart</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;
+        border:1.5px solid ${isSeg2eSoir?'var(--navy)':'var(--border)'};border-radius:8px;
+        background:${isSeg2eSoir?'#EBF2FB':'var(--surface)'};user-select:none"
+        onclick="toggleSeg2eSoir(${dayIdx},${si})">
+        <div style="width:36px;height:20px;border-radius:10px;
+          background:${isSeg2eSoir?'var(--navy)':'#D8E1EF'};
+          position:relative;flex-shrink:0;transition:.2s">
+          <div style="width:16px;height:16px;border-radius:50%;background:#fff;
+            position:absolute;top:2px;left:${isSeg2eSoir?'18':'2'}px;
+            transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+        </div>
+        <span style="font-size:12px;font-weight:${isSeg2eSoir?'600':'400'};
+          color:${isSeg2eSoir?'var(--navy)':'var(--muted)'}">
+          ${isSeg2eSoir?'2e soir':'Quart normal'}
+        </span>
+      </label>
+    </div>` : (isSeg2eSoir && locked ? `
+    <div class="field">
+      <label>Type de quart</label>
+      <div style="padding:8px 10px;font-size:12px;color:var(--navy);font-weight:600">2e soir</div>
+    </div>` : '');
+
   div.innerHTML=`
     <div class="seg-hdr">
-      <span class="seg-num">Segment ${si+1}</span>
+      <span class="seg-num">Segment ${si+1}${isSeg2eSoir?' <span style="font-size:10px;background:#EBF2FB;color:var(--navy);padding:1px 6px;border-radius:10px;font-weight:600">2e soir</span>':''}</span>
       <span class="dent-pill" ${pillStyle}>${pillLabel}</span>
     </div>
-    <div class="seg-fields">
+    <div class="seg-fields" style="grid-template-columns:1fr 1fr 80px 1fr 1fr auto">
       <div class="field"><label>Entrée</label>
         <input type="time" value="${seg.entree||''}" ${locked?'disabled':''}
           oninput="updSeg(${dayIdx},${si},'entree',this.value)"
@@ -1128,6 +1213,7 @@ function buildSegEl(dayIdx,si,seg,locked) {
         <input type="number" min="0" max="180" step="5" value="${seg.pause||''}" placeholder="0"
           ${locked?'disabled':''}
           oninput="updSeg(${dayIdx},${si},'pause',this.value)"></div>
+      ${soirHtml}
       <div class="field f-dent"><label>Dentiste</label>
         <select ${locked?'disabled':''} onchange="updSeg(${dayIdx},${si},'dentist',this.value)">
           <option value="">— Sélectionner —</option>${opts}</select></div>
@@ -1138,15 +1224,34 @@ function buildSegEl(dayIdx,si,seg,locked) {
   return div;
 }
 
+function toggleSeg2eSoir(dayIdx, si) {
+  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
+  if (!segs[si]) return;
+  segs[si].is2eSoir = !segs[si].is2eSoir;
+  setEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx, segs);
+  // Re-render just this segment
+  const el = document.getElementById(`seg_${dayIdx}_${si}`);
+  const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
+  if (el) el.replaceWith(buildSegEl(dayIdx, si, segs[si], locked));
+  updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
+}
+
+function getSegEmpName(seg) {
+  // Returns the effective employee name for a segment (base or 2e soir)
+  const base = currentEmployee.replace(' 2e soir','').trim();
+  return seg.is2eSoir ? `${base} 2e soir` : base;
+}
+
 function addSeg(dayIdx) {
-  const segs=[...getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx),{entree:'',sortie:'',pause:'0',dentist:''}];
+  const segs = [...getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx),
+                {entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false}];
   setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
   if(!document.getElementById(`db_${dayIdx}`)?.classList.contains('open')) toggleDay(dayIdx);
 }
 
 function delSeg(dayIdx,si) {
-  const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
+   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
   segs.splice(si,1); setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
 }
@@ -1156,11 +1261,11 @@ function updSeg(dayIdx,si,field,value) {
   if(!segs[si])return; segs[si][field]=value;
   setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-  if(field==='dentist') revalSeg(dayIdx,si);
+  if(field==='dentist'||field==='entree'||field==='sortie') revalDay(dayIdx);
 }
 
 function revalSeg(dayIdx,si) {
-  const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
+   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
   if(!segs[si])return;
   const seg=segs[si], el=document.getElementById(`seg_${dayIdx}_${si}`); if(!el)return;
   const v=validate(seg);
@@ -1183,9 +1288,85 @@ function validate(seg){
   const pause=parseInt(seg.pause)||0, totalMin=sm-em-pause;
   if(totalMin<=0)return{valid:false,error:true,msg:"⚠ La pause dépasse la durée de travail.",hrs:0};
   const hrs=totalMin/60, dn=dentists.find(d=>d.key===seg.dentist)?.short||seg.dentist;
-  return{valid:true,error:false,msg:`✓ ${seg.entree} → ${seg.sortie}${pause?` (pause ${pause}min)`:''} = ${fmtH(hrs)} avec ${dn}`,hrs};
+  return{valid:true,error:false,msg:`✓ ${seg.entree} → ${seg.sortie}${pause?` (pause ${pause}min)`:''} = ${fmtH(hrs)} avec ${dn}`,hrs,em,sm};
 }
 
+function checkOverlaps(dayIdx) {
+  return checkOverlapsForEmp(currentEmployee, dayIdx);
+}
+
+function checkOverlapsForEmp(empName, dayIdx) {
+  // Détecte les chevauchements d'horaires entre segments d'une même journée
+  const segs = getEmpDaySegs(currentPeriodIndex, empName, dayIdx);
+  const errors = [];
+  for (let i = 0; i < segs.length; i++) {
+    const vi = validate(segs[i]);
+    if (!vi.valid) continue;
+    for (let j = i+1; j < segs.length; j++) {
+      const vj = validate(segs[j]);
+      if (!vj.valid) continue;
+      if (vi.em < vj.sm && vj.em < vi.sm) {
+        errors.push({
+          si: i, sj: j,
+          msg: `⚠ Conflit : Segment ${i+1} (${segs[i].entree}–${segs[i].sortie}) chevauche Segment ${j+1} (${segs[j].entree}–${segs[j].sortie})`
+        });
+      }
+    }
+  }
+  return errors;
+}
+
+function revalDay(dayIdx) {
+  // Re-validate all segments in a day and show overlap errors
+  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
+  const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
+  const overlaps = checkOverlaps(dayIdx);
+  const overlapSis = new Set(overlaps.flatMap(e => [e.si, e.sj]));
+
+  segs.forEach((seg, si) => {
+    const el = document.getElementById(`seg_${dayIdx}_${si}`);
+    if (!el) return;
+    const v = validate(seg);
+    const hasOverlap = overlapSis.has(si);
+
+    // Class: overlap takes priority over valid/error
+    el.className = `seg ${hasOverlap ? 'error' : v.valid ? 'valid' : v.error ? 'error' : ''}`;
+    const msgEl = el.querySelector('.seg-msg');
+    if (hasOverlap) {
+      const ovErr = overlaps.find(e => e.si===si || e.sj===si);
+      msgEl.className = 'seg-msg bad';
+      msgEl.textContent = ovErr ? ovErr.msg : '⚠ Chevauchement d\'horaire détecté.';
+    } else {
+      msgEl.className = `seg-msg ${v.valid?'ok':v.error?'bad':''}`;
+      msgEl.textContent = v.msg || '';
+    }
+
+    // Update dentist pill
+    const pill = el.querySelector('.dent-pill');
+    if (pill) {
+      const dk = seg.dentist||'', dobj = dentists.find(d=>d.key===dk);
+      pill.style.background = dobj ? dobj.color : '#9BAABF';
+      pill.textContent = dobj ? dobj.short : 'Aucune';
+    }
+  });
+
+  // Show day-level overlap summary if any
+  const sumEl = document.getElementById(`ds_${dayIdx}`);
+  if (sumEl && overlaps.length > 0) {
+    const overlapHtml = overlaps.map(e =>
+      `<div style="color:var(--err);font-size:11px;font-weight:600;padding:2px 0">${e.msg}</div>`
+    ).join('');
+    sumEl.innerHTML = `<div class="ds-title" style="color:var(--err)">⚠ Conflits d'horaire</div>${overlapHtml}`;
+  }
+}
+
+function revalSeg(dayIdx, si) {
+  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
+  if (!segs[si]) return;
+  // Revalider toute la journée pour détecter les chevauchements
+  revalDay(dayIdx);
+  updateDaySummary(dayIdx);
+}
 function getDayTotal(di){return getEmpDaySegs(currentPeriodIndex,currentEmployee,di).reduce((s,seg)=>s+(validate(seg).hrs||0),0);}
 function getDayByDentist(di){const r={};getEmpDaySegs(currentPeriodIndex,currentEmployee,di).forEach(seg=>{const v=validate(seg);if(v.valid&&seg.dentist)r[seg.dentist]=(r[seg.dentist]||0)+v.hrs;});return r;}
 
@@ -1234,11 +1415,18 @@ async function showApercu() {
   if(currentPeriodIndex>0) await loadAllPeriod(currentPeriodIndex-1);
   hideLoadingOverlay();
 
-  // Section 1 — Erreurs
+  // Section 1 — Erreurs (validation + chevauchements)
   const errors=[];
-  for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach((seg,si)=>{
-    const v=validate(seg); if(v.error) errors.push(`${DAYS_FR[i%5]} Sem${i<5?1:2}, seg ${si+1} : ${v.msg}`);
-  });
+  for(let i=0;i<10;i++) {
+    getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach((seg,si)=>{
+      const v=validate(seg); if(v.error) errors.push(`${DAYS_FR[i%5]} Sem${i<5?1:2}, seg ${si+1} : ${v.msg}`);
+    });
+    const overlaps = checkOverlaps(i);
+    const p2 = getPeriod(currentPeriodIndex);
+    overlaps.forEach(e => errors.push(
+      `${DAYS_FR[i%5]} Sem${i<5?1:2} (${p2.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}) : ${e.msg}`
+    ));
+  }
   const errDiv=document.getElementById('apercuErrors'), errOk=document.getElementById('apercuOk');
   if(errors.length){errDiv.style.display='block';errOk.style.display='none';
     document.getElementById('apercuErrorList').innerHTML=errors.map(e=>`<div>• ${e}</div>`).join('');}
@@ -1312,8 +1500,13 @@ async function showApercu() {
   }
 
   const sendBtn=document.getElementById('apercuSendBtn');
-  sendBtn.style.opacity=errors.length?'0.45':'1';
-  sendBtn.style.display=isAdmin?'':'none';
+  const hasErrors = errors.length > 0;
+  sendBtn.style.opacity = hasErrors ? '0.45' : '1';
+  sendBtn.style.cursor  = hasErrors ? 'not-allowed' : 'pointer';
+  sendBtn.disabled      = hasErrors;
+  sendBtn.title         = hasErrors ? 'Corrigez les erreurs et conflits avant d\'envoyer.' : '';
+  sendBtn.style.display = isAdmin ? '' : 'none';
+  sendBtn.onclick       = hasErrors ? null : ()=>{ closeApercu(); showSendModal(); };
   document.getElementById('apercuModal').classList.add('open');
 }
 
@@ -1324,6 +1517,26 @@ function closeApercu(){document.getElementById('apercuModal').classList.remove('
 // ═══════════════════════════════════════════════════════════════
 function showSendModal(){
   if(!isAdmin){toast('Seul l\'administrateur peut envoyer.','warn');return;}
+
+  // Vérifier conflits pour toutes les employées avant d'autoriser l'envoi
+  const conflictMessages = [];
+  employees.forEach(emp => {
+    for(let i=0;i<10;i++){
+      const overlaps = checkOverlapsForEmp(emp.name, i);
+      overlaps.forEach(e => {
+        const p = getPeriod(currentPeriodIndex);
+        const w = i<5?1:2;
+        conflictMessages.push(`• ${emp.name} — ${DAYS_FR[i%5]} Sem${w} (${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}) : Seg ${e.si+1} et Seg ${e.sj+1} se chevauchent`);
+      });
+    }
+  });
+
+  if(conflictMessages.length > 0){
+    // Afficher modal de blocage avec détails
+    showConflictBlock(conflictMessages);
+    return;
+  }
+
   const p=getPeriod(currentPeriodIndex); let count=0;
   for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{if(validate(s).valid)count++;});
   document.getElementById('mEmail').textContent=settings.email;
@@ -1331,6 +1544,19 @@ function showSendModal(){
   document.getElementById('mCount').textContent=count;
   document.getElementById('sendModal').classList.add('open');
 }
+function showConflictBlock(messages) {
+  const modal = document.getElementById('conflictModal');
+  const list  = document.getElementById('conflictList');
+  list.innerHTML = messages.map(m =>
+    `<div style="padding:6px 0;border-bottom:1px solid #FECACA;font-size:12px;color:#7F1D1D">${m}</div>`
+  ).join('');
+  modal.classList.add('open');
+}
+
+function closeConflictModal() {
+  document.getElementById('conflictModal').classList.remove('open');
+}
+
 function closeModal(){document.getElementById('sendModal').classList.remove('open');}
 
 // Colonnes Excel
@@ -1343,14 +1569,22 @@ const DENT_COLS={
 const SEMAINE_ROWS={'Anne G.':6,'Anne G. 2e soir':7,'Annick':8,'Annick 2e soir':9,'Céline':10,'Céline 2e soir':11,'Josée':12,'Josée 2e soir':13,'Marie Claude':14,'Marie Claude 2e soir':15,'Nancy P.':16,'Nancy P. 2e soir':17,'Philippe Girard':18,'Philippe Girard 2e soir':19,'Audrey Demers':21,'Audrey Demers 2e soir':22,'Élizabeth':23,'Élizabeth 2e soir':24,'Éléonore':25,'Éléonore 2e soir':26,'Isabelle':27,'Isabelle 2e soir':28,'Mélissa':29,'Mélissa 2e soir':30,'Nancy Guillemette':31,'Nancy Guillemette 2e soir':32,'Chantal':34,'Chantal 2e soir':35,'Jessica':36,'Jessica 2e soir':37,'Lison':38,'Lison 2e soir':39,'Manon':40,'Manon 2e soir':41,'Marie-Ève M.':42,'Marie-Ève M. 2e soir':43,'Marilyn':44,'Marilyn 2e soir':45,'Mélanie':46,'Mélanie 2e soir':47,'Myriam':48,'Myriam 2e soir':49,'Nancy V.':50,'Nancy V. 2e soir':51,'Sabrina':52,'Sabrina 2e soir':53};
 const HEURES_ROWS={...SEMAINE_ROWS};
 
-function getEmpHoursPerDentistPerWeek(empName,pi){
-  const result={};
-  for(let i=0;i<10;i++){
-    const sem=i<5?'sem1':'sem2';
-    getEmpDaySegs(pi,empName,i).forEach(seg=>{
-      const v=validate(seg); if(!v.hrs||!seg.dentist)return;
-      if(!result[seg.dentist])result[seg.dentist]={sem1:0,sem2:0};
-      result[seg.dentist][sem]+=v.hrs;
+function getEmpHoursPerDentistPerWeek(empName, pi) {
+  // Returns { dentistKey: { sem1: h, sem2: h } } for a given employee name
+  // For segments with is2eSoir, only count if empName matches the 2e soir variant
+  const base = empName.replace(' 2e soir','').trim();
+  const is2eSoirEmp = empName.includes('2e soir');
+  const result = {};
+  for (let i=0; i<10; i++) {
+    const sem = i<5?'sem1':'sem2';
+    // Load from base employee's storage (all segments stored under base name)
+    getEmpDaySegs(pi, base, i).forEach(seg => {
+      const segIs2e = seg.is2eSoir || false;
+      // Only count segment if it matches the requested employee type
+      if (segIs2e !== is2eSoirEmp) return;
+      const v = validate(seg); if (!v.hrs || !seg.dentist) return;
+      if (!result[seg.dentist]) result[seg.dentist] = {sem1:0,sem2:0};
+      result[seg.dentist][sem] += v.hrs;
     });
   }
   return result;
@@ -1677,28 +1911,25 @@ function toast(msg,type='info'){
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
   loadConfig();
-  // Migration ADMIN/FORMATION
   ['ADMIN','FORMATION'].forEach(k=>{
     if(!dentists.find(d=>d.key===k)){const d=DEFAULT_DENTISTS.find(x=>x.key===k);if(d)dentists.push(d);}
   });
 
-  // Vérifier session existante
-  const savedName  = localStorage.getItem('session_name');
-  const savedEmail = localStorage.getItem('session_email');
+  // Charger les courriels depuis Supabase pour pré-remplir lors de la connexion
+  try {
+    const rows = await sbFetch('employe_emails');
+    rows.forEach(r => {
+      const emp = employees.find(e => e.name === r.emp_name);
+      if (emp && r.email) emp.email = r.email;
+    });
+    saveConfig(); // Mettre à jour le cache local
+  } catch(e) {
+    console.warn('Impossible de charger les courriels depuis Supabase:', e);
+  }
 
   hideLoadingOverlay();
-
-  if (savedName && savedEmail) {
-    // Reconnecter automatiquement
-    currentEmployee  = savedName;
-    currentUserEmail = savedEmail;
-    isAdmin = (savedEmail === ADMIN_EMAIL);
-    await showApp();
-  } else {
-    // Afficher login
-    populateLoginSelector();
-    document.getElementById('loginPage').style.display = '';
-  }
+  populateLoginSelector();
+  document.getElementById('loginPage').style.display = '';
 });
 </script>
 </body>
