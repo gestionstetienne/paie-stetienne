@@ -856,9 +856,36 @@ async function loadAllPeriod(pi) {
         entree:r.entree||'',sortie:r.sortie||'',pause:String(r.pause||0),dentist:r.dentist||'',is2eSoir:r.is_2e_soir||false
       };
     });
-    Object.entries(byEmp).forEach(([n,d]) => { _cache[ck(pi,n)] = d; });
+    // Mettre à jour le cache SEULEMENT si Supabase a des données pour cet employé
+    // Ne pas écraser le cache localStorage avec des données vides
+    Object.entries(byEmp).forEach(([n,d]) => {
+      if (Object.keys(d).length > 0) _cache[ck(pi,n)] = d;
+    });
+    // Pour les employés non trouvés dans Supabase, charger depuis localStorage
+    employees.forEach(emp => {
+      const k = ck(pi, emp.name);
+      if (!_cache[k] || Object.keys(_cache[k]).length === 0) {
+        try {
+          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
+          if (local && Object.keys(local).length > 0) _cache[k] = local;
+        } catch(e) {}
+      }
+    });
     return byEmp;
-  } catch(e) { console.error(e); return {}; }
+  } catch(e) {
+    console.error(e);
+    // En cas d'erreur Supabase, charger tout depuis localStorage
+    employees.forEach(emp => {
+      const k = ck(pi, emp.name);
+      if (!_cache[k]) {
+        try {
+          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
+          if (local) _cache[k] = local;
+        } catch(e2) {}
+      }
+    });
+    return {};
+  }
 }
 
 function isSent(idx) { return !!localStorage.getItem(`sent_${idx}`); }
@@ -1015,15 +1042,21 @@ async function showApp() {
   injectDentistColors();
   initColorPicker();
 
-  // Charger les données de l'employée courante
+  // Charger les données fraîches depuis Supabase à chaque connexion
   showLoadingOverlay('Chargement de vos données…');
+  // Vider le cache pour forcer rechargement depuis Supabase
+  delete _cache[ck(currentPeriodIndex, currentEmployee)];
+  if (currentPeriodIndex > 0)
+    delete _cache[ck(currentPeriodIndex-1, currentEmployee)];
+
   await loadEmpPeriod(currentPeriodIndex, currentEmployee);
   if (currentPeriodIndex > 0)
     await loadEmpPeriod(currentPeriodIndex-1, currentEmployee);
 
-  // Pour les variantes 2e soir, charger aussi les données de la même période
+  // Pour les variantes 2e soir
   const base = currentEmployee.replace(' 2e soir','').trim();
   if (base !== currentEmployee) {
+    delete _cache[ck(currentPeriodIndex, base)];
     await loadEmpPeriod(currentPeriodIndex, base);
   }
   hideLoadingOverlay();
@@ -1423,27 +1456,23 @@ function updateSummary(){
 //  APERÇU
 // ═══════════════════════════════════════════════════════════════
 async function showApercu() {
-  if(!currentEmployee)return;
-  const p=getPeriod(currentPeriodIndex);
+  if(!currentEmployee) return;
+  const p = getPeriod(currentPeriodIndex);
 
+  // Charger période précédente si besoin (pour comparaison)
   showLoadingOverlay('Préparation de l\'aperçu…');
-
-  // Charger depuis Supabase
-  await loadAllPeriod(currentPeriodIndex);
-  if(currentPeriodIndex>0) await loadAllPeriod(currentPeriodIndex-1);
-
-  // Si le cache est vide pour l'employée courante, lire depuis localStorage
-  const ck_cur = ck(currentPeriodIndex, currentEmployee);
-  if (!_cache[ck_cur] || Object.keys(_cache[ck_cur]).length === 0) {
-    try {
-      const local = JSON.parse(localStorage.getItem(`paie_${ck_cur}`));
-      if (local) {
-        _cache[ck_cur] = local;
-        console.log('Aperçu: fallback vers localStorage pour', currentEmployee);
+  if(currentPeriodIndex > 0) {
+    // Charger depuis localStorage d'abord pour la période précédente
+    employees.forEach(emp => {
+      const k = ck(currentPeriodIndex-1, emp.name);
+      if (!_cache[k]) {
+        try {
+          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
+          if (local) _cache[k] = local;
+        } catch(e) {}
       }
-    } catch(e) {}
+    });
   }
-
   hideLoadingOverlay();
 
   // Section 1 — Erreurs (validation + chevauchements)
