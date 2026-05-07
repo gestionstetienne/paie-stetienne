@@ -733,7 +733,7 @@ const DEFAULT_DENTISTS = [
 
 const DEFAULT_SETTINGS = {
   email: 'gestionstetienne@gmail.com',
-  anchorDate: '2026-04-13',
+  anchorDate: '2026-05-04',
 };
 
 const ADMIN_EMAIL = 'gestionstetienne@gmail.com'; // seul ce compte voit le bouton Envoyer
@@ -1080,8 +1080,8 @@ function hideLoadingOverlay() {
 const DAYS_FR = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi'];
 
 function getAnchor() {
-  const d = new Date((settings.anchorDate||'2026-04-13')+'T00:00:00');
-  return isNaN(d) ? new Date('2026-04-13T00:00:00') : d;
+  const d = new Date((settings.anchorDate||'2026-05-04')+'T00:00:00');
+  return isNaN(d) ? new Date('2026-05-04T00:00:00') : d;
 }
 
 function getPeriod(idx) {
