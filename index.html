@@ -548,6 +548,20 @@ optgroup { font-weight:700; font-style:normal; }
           <div class="setting-row"><label>Date début (1ère période) :</label><input type="date" id="settingAnchor"></div>
         </div>
         <button class="save-settings-btn" onclick="saveSettings()">✓ Enregistrer</button>
+
+        <div class="admin-section" style="margin-top:20px">
+          <h3>🔓 Déverrouiller une période</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+            Permet de rouvrir une période déjà envoyée pour corriger des heures.
+          </p>
+          <div class="setting-row">
+            <label>Numéro de période :</label>
+            <input type="number" id="unlockPeriodNum" min="1" max="99" placeholder="ex: 1" style="max-width:100px">
+          </div>
+          <button onclick="unlockPeriod()" style="width:100%;padding:10px;background:#DC2626;color:#fff;border:none;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">
+            🔓 Déverrouiller cette période
+          </button>
+        </div>
       </div>
       <!-- REMINDERS -->
       <div id="panel-reminders" style="display:none">
@@ -2081,6 +2095,37 @@ function deleteDentist(idx){
   dentists.splice(idx,1); saveConfig(); injectDentistColors(); renderAdminDentists();
   if(currentEmployee) renderDays();
   toast(`${d.short} supprimé.`,'info');
+}
+
+async function unlockPeriod() {
+  const input = document.getElementById('unlockPeriodNum');
+  const num = parseInt(input.value);
+  if (!num || num < 1) {
+    toast('Entrez un numéro de période valide.', 'warn');
+    return;
+  }
+  const periodeIndex = num - 1; // Période 1 = index 0
+
+  if (!confirm(`Déverrouiller la Période ${num} ?\n\nCela permettra de modifier les heures à nouveau.`)) return;
+
+  try {
+    // Supprimer de Supabase
+    await sbFetch(
+      `periodes_envoyees?periode_index=eq.${periodeIndex}`,
+      { method: 'DELETE', prefer: '' }
+    );
+    // Supprimer du localStorage
+    localStorage.removeItem(`sent_${periodeIndex}`);
+
+    toast(`✓ Période ${num} déverrouillée`, 'ok');
+    input.value = '';
+    closeAdmin();
+    updatePeriodUI();
+    renderDays();
+  } catch(e) {
+    console.error(e);
+    toast('Erreur lors du déverrouillage.', 'err');
+  }
 }
 
 function saveSettings(){
