@@ -1820,7 +1820,9 @@ async function doSend(){
   const pStr=`${fmtDate(p.start)} au ${fmtDate(p.end)}`;
   const filename=`Répartition_StEtienne_P${currentPeriodIndex+1}_${p.start.toISOString().slice(0,10)}.xlsx`;
 
-  showLoadingOverlay('Chargement des données…');
+  // Vider le cache et recharger UNIQUEMENT depuis Supabase
+  showLoadingOverlay('Chargement des données depuis Supabase…');
+  employees.forEach(emp => { delete _cache[ck(currentPeriodIndex, emp.name)]; });
   await loadAllPeriod(currentPeriodIndex);
 
   showLoadingOverlay('Téléchargement du fichier modèle…');
