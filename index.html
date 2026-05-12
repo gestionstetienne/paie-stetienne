@@ -1,1996 +1,661 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Paie — Clinique St-Étienne</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+import { useState, useEffect, useCallback, useRef } from "react";
 
-:root {
-  --navy:#1C3557; --navy2:#2C4770;
-  --bg:#EEF2F9; --surface:#FFFFFF; --surf2:#F5F7FC;
-  --border:#D8E1EF; --text:#1A2340; --muted:#6B7A99; --light:#9BAABF;
-  --ok:#16A34A; --ok-l:#DCFCE7;
-  --warn:#D97706; --warn-l:#FEF3C7;
-  --err:#DC2626; --err-l:#FEE2E2;
-  --locked:#64748B; --locked-l:#F1F5F9;
-  --r:12px; --r-sm:8px;
-  --sh:0 2px 12px rgba(28,53,87,.08); --sh-lg:0 8px 32px rgba(28,53,87,.14);
-}
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-
-/* ── LOGIN ── */
-.login-wrap {
-  min-height:100vh; display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(135deg,#1C3557 0%,#2C4770 60%,#1565C0 100%);
-  padding:24px;
-}
-.login-card {
-  background:#fff; border-radius:20px; padding:40px 36px; width:100%; max-width:400px;
-  box-shadow:0 24px 64px rgba(0,0,0,.25);
-}
-.login-logo { text-align:center; margin-bottom:28px; }
-.login-logo .tooth { font-size:48px; }
-.login-logo h1 { font-size:22px; font-weight:700; color:var(--navy); margin-top:8px; }
-.login-logo p  { font-size:13px; color:var(--muted); margin-top:4px; }
-.login-field { margin-bottom:14px; }
-.login-field label { display:block; font-size:12px; font-weight:600; color:var(--muted);
-  text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
-.login-field select, .login-field input {
-  width:100%; padding:12px 14px; border:2px solid var(--border); border-radius:10px;
-  font-family:'DM Sans',sans-serif; font-size:15px; color:var(--text);
-  background:#fff; transition:.15s; appearance:none;
-}
-.login-field select:focus, .login-field input:focus {
-  outline:none; border-color:var(--navy2); box-shadow:0 0 0 3px rgba(44,71,112,.1);
-}
-.login-btn {
-  width:100%; padding:14px; background:var(--navy); color:#fff; border:none;
-  border-radius:10px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700;
-  cursor:pointer; transition:.15s; margin-top:6px;
-}
-.login-btn:hover { background:#142a45; }
-.login-btn:disabled { opacity:.5; cursor:not-allowed; }
-.login-err { background:var(--err-l); border:1px solid var(--err); border-radius:8px;
-  padding:10px 14px; font-size:13px; color:var(--err); margin-top:10px; display:none; }
-
-/* ── HEADER ── */
-header {
-  background:var(--navy); height:58px; padding:0 20px;
-  display:flex; align-items:center; justify-content:space-between;
-  position:sticky; top:0; z-index:200; box-shadow:0 2px 16px rgba(0,0,0,.25);
-}
-.h-brand { display:flex; align-items:center; gap:10px; }
-.h-logo { width:32px; height:32px; background:rgba(255,255,255,.12); border-radius:8px;
-  display:flex; align-items:center; justify-content:center; font-size:17px; }
-.h-title { font-size:15px; font-weight:600; color:#fff; }
-.h-sub   { font-size:11px; color:rgba(255,255,255,.55); }
-.h-right { display:flex; align-items:center; gap:8px; }
-.h-clock { font-family:'DM Mono',monospace; font-size:12px; color:rgba(255,255,255,.65);
-  background:rgba(255,255,255,.09); padding:5px 11px; border-radius:6px; }
-.h-sync  { font-size:11px; color:rgba(255,255,255,.6); font-style:italic; min-width:100px; text-align:right; }
-.h-user  { display:flex; align-items:center; gap:8px; }
-.h-user-name { font-size:12px; font-weight:600; color:rgba(255,255,255,.9);
-  background:rgba(255,255,255,.12); padding:5px 11px; border-radius:6px; }
-.h-admin-btn {
-  padding:6px 12px; border-radius:6px; border:1.5px solid rgba(255,255,255,.25);
-  background:transparent; color:rgba(255,255,255,.85); font-family:'DM Sans',sans-serif;
-  font-size:12px; font-weight:600; cursor:pointer; transition:.15s;
-  display:flex; align-items:center; gap:5px;
-}
-.h-admin-btn:hover { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.4); }
-.h-logout { padding:6px 10px; border-radius:6px; border:1.5px solid rgba(255,255,255,.2);
-  background:transparent; color:rgba(255,255,255,.6); font-size:11px; cursor:pointer;
-  font-family:'DM Sans',sans-serif; transition:.15s; }
-.h-logout:hover { background:rgba(255,255,255,.1); color:#fff; }
-
-/* ── MAIN ── */
-.main { max-width:960px; margin:0 auto; padding:24px 16px 72px; }
-
-/* ── CARDS ── */
-.card { background:var(--surface); border-radius:var(--r); box-shadow:var(--sh);
-  border:1px solid var(--border); padding:16px 20px; margin-bottom:16px; }
-
-/* ── PERIOD BAR ── */
-.period-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.nav-btn { width:30px; height:30px; border-radius:6px; border:1.5px solid var(--border);
-  background:var(--surface); color:var(--text); cursor:pointer; font-size:14px;
-  display:flex; align-items:center; justify-content:center; transition:.15s; }
-.nav-btn:hover { background:rgba(31,78,121,.1); border-color:var(--navy2); color:var(--navy2); }
-.period-label { background:var(--surf2); border:1px solid var(--border); border-radius:var(--r-sm);
-  padding:7px 14px; font-size:13px; font-weight:600; color:var(--navy);
-  display:flex; align-items:center; gap:8px; }
-.badge { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
-  padding:2px 8px; border-radius:20px; }
-.badge-navy   { background:var(--navy); color:#fff; }
-.badge-lock   { background:var(--locked); color:#fff; }
-.badge-sent   { background:var(--ok); color:#fff; }
-.due-lbl { font-size:12px; color:var(--warn); font-weight:500; margin-left:auto; }
-.due-urgent { color:var(--err); font-weight:700; }
-
-/* ── LOCKED BANNER ── */
-.locked-banner { background:var(--locked-l); border:1.5px solid var(--locked);
-  border-radius:var(--r); padding:16px 18px; display:flex; align-items:center; gap:12px; }
-.locked-icon { font-size:22px; flex-shrink:0; }
-.locked-text h3 { font-size:13px; font-weight:600; color:var(--locked); }
-.locked-text p  { font-size:12px; color:var(--muted); margin-top:2px; }
-
-/* ── DAY CARD ── */
-.day-card { background:var(--surface); border-radius:var(--r); box-shadow:var(--sh);
-  border:1px solid var(--border); margin-bottom:10px; overflow:hidden; }
-.day-hdr { display:flex; align-items:center; justify-content:space-between;
-  padding:11px 16px; background:var(--surf2); border-bottom:1px solid var(--border);
-  cursor:pointer; user-select:none; }
-.day-hdr:hover { background:#EBF0F8; }
-.day-info { display:flex; align-items:center; gap:10px; }
-.day-name { font-size:14px; font-weight:600; }
-.day-meta { font-size:11px; color:var(--muted); }
-.day-right { display:flex; align-items:center; gap:8px; }
-.day-total { font-family:'DM Mono',monospace; font-size:12px; padding:3px 10px;
-  border-radius:20px; background:var(--surf2); color:var(--muted);
-  border:1px solid var(--border); min-width:52px; text-align:center; }
-.day-total.active { background:var(--ok-l); color:var(--ok); border-color:var(--ok); }
-.day-chev { color:var(--muted); font-size:11px; transition:transform .2s; }
-.day-chev.open { transform:rotate(180deg); }
-.day-body { display:none; padding:14px 16px; }
-.day-body.open { display:block; }
-
-/* ── SEGMENT ── */
-.segs { display:flex; flex-direction:column; gap:8px; }
-.seg { border:1.5px solid var(--border); border-radius:var(--r-sm); overflow:hidden; }
-.seg.valid { border-color:var(--ok); }
-.seg.error { border-color:var(--err); }
-.seg-hdr { display:flex; align-items:center; justify-content:space-between;
-  padding:7px 12px; background:var(--surf2); }
-.seg-num { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
-.dent-pill { display:inline-flex; align-items:center; font-size:11px; font-weight:600;
-  padding:2px 9px; border-radius:20px; color:#fff; }
-.seg-fields { display:grid; grid-template-columns:1fr 1fr 90px 1fr auto;
-  gap:8px; padding:10px 12px; align-items:end; }
-@media(max-width:580px){ .seg-fields { grid-template-columns:1fr 1fr; }
-  .seg-fields .f-dent,.del-btn { grid-column:1/-1; } .del-btn { width:100%; } }
-.field { display:flex; flex-direction:column; gap:3px; }
-.field label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
-.field input, .field select { padding:8px 10px; border:1.5px solid var(--border);
-  border-radius:var(--r-sm); font-family:'DM Sans',sans-serif; font-size:13px;
-  font-weight:500; color:var(--text); background:var(--surface); width:100%; transition:.15s; }
-.field input[type=time] { font-family:'DM Mono',monospace; }
-.field input:focus, .field select:focus { outline:none; border-color:var(--navy2); }
-.field input.ok { border-color:var(--ok); } .field input.bad { border-color:var(--err); }
-.del-btn { width:34px; height:34px; background:var(--err-l); color:var(--err);
-  border:1.5px solid transparent; border-radius:var(--r-sm); cursor:pointer;
-  font-size:15px; align-self:flex-end; display:flex; align-items:center; justify-content:center; }
-.del-btn:hover { background:#fbd0d0; border-color:var(--err); }
-.seg-msg { padding:4px 12px 7px; font-size:11px; font-weight:500; display:none; }
-.seg-msg.ok { display:block; color:var(--ok); } .seg-msg.bad { display:block; color:var(--err); }
-.add-seg-btn { width:100%; margin-top:8px; padding:9px; background:transparent;
-  border:1.5px dashed var(--border); border-radius:var(--r-sm); font-family:'DM Sans',sans-serif;
-  font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; transition:.15s;
-  display:flex; align-items:center; justify-content:center; gap:6px; }
-.add-seg-btn:hover { border-color:var(--navy2); color:var(--navy2); background:rgba(31,78,121,.05); }
-
-/* ── DAY SUMMARY ── */
-.day-sum { margin-top:10px; padding:10px 12px; background:var(--surf2);
-  border-radius:var(--r-sm); border:1px solid var(--border); }
-.ds-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:6px; }
-.ds-pills { display:flex; flex-wrap:wrap; gap:5px; }
-.ds-pill { font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; }
-.ds-none { font-size:12px; color:var(--light); font-style:italic; }
-
-/* ── SUMMARY TABLE ── */
-.sum-table-wrap { overflow-x:auto; }
-.sum-table { width:100%; border-collapse:collapse; font-size:12px; min-width:500px; }
-.sum-table th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
-  color:var(--muted); padding:6px 10px; border-bottom:2px solid var(--border); text-align:center; }
-.sum-table th:first-child { text-align:left; }
-.sum-table td { padding:7px 10px; border-bottom:1px solid var(--border); text-align:center;
-  font-family:'DM Mono',monospace; font-size:11px; }
-.sum-table td:first-child { text-align:left; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; }
-.sum-table tr:last-child td { border-bottom:none; }
-.tot-row td { font-weight:700; background:var(--surf2); }
-.cell-v { color:var(--text); } .cell-n { color:var(--light); }
-
-/* ── ACTIONS ── */
-.actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
-.btn { display:inline-flex; align-items:center; gap:7px; padding:10px 18px;
-  border-radius:var(--r-sm); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
-  cursor:pointer; border:none; transition:.15s; }
-.btn-primary { background:var(--navy); color:#fff; }
-.btn-primary:hover { background:#142a45; }
-.btn-send { background:var(--ok); color:#fff; }
-.btn-send:hover { background:#138033; }
-.btn-sec { background:var(--surf2); color:var(--text); border:1.5px solid var(--border); }
-.btn-sec:hover { background:var(--border); }
-.btn-danger { background:var(--err-l); color:var(--err); border:1.5px solid var(--err); }
-.btn-danger:hover { background:#fbd0d0; }
-
-/* ── ADMIN PANEL ── */
-.admin-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:400;
-  opacity:0; pointer-events:none; transition:opacity .25s; }
-.admin-overlay.open { opacity:1; pointer-events:all; }
-.admin-panel {
-  position:fixed; top:0; right:0; bottom:0; width:min(480px,100vw);
-  background:var(--surface); z-index:401; box-shadow:-8px 0 40px rgba(0,0,0,.2);
-  display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s;
-}
-.admin-overlay.open .admin-panel { transform:none; }
-.admin-hdr { background:var(--navy); padding:18px 20px; display:flex; align-items:center; justify-content:space-between; }
-.admin-hdr h2 { font-size:16px; font-weight:700; color:#fff; }
-.admin-close { width:30px; height:30px; background:rgba(255,255,255,.15); border:none; border-radius:6px;
-  color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-.admin-tabs { display:flex; border-bottom:2px solid var(--border); }
-.admin-tab { flex:1; padding:11px; font-size:12px; font-weight:600; text-align:center;
-  cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-2px; transition:.15s; }
-.admin-tab.active { color:var(--navy); border-bottom-color:var(--navy); }
-.admin-body { flex:1; overflow-y:auto; padding:20px; }
-.admin-section { margin-bottom:24px; }
-.admin-section h3 { font-size:12px; font-weight:700; color:var(--navy2); margin-bottom:10px;
-  padding-bottom:5px; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.5px; }
-.item-list { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
-.list-item { display:flex; align-items:center; gap:8px; padding:8px 12px;
-  background:var(--surf2); border:1px solid var(--border); border-radius:var(--r-sm); }
-.list-item-name { flex:1; font-size:13px; font-weight:500; }
-.list-item-cat  { font-size:11px; color:var(--muted); margin-right:auto; }
-.list-item-email { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; }
-.list-item-color { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
-.item-del { width:26px; height:26px; background:var(--err-l); color:var(--err);
-  border:none; border-radius:5px; cursor:pointer; font-size:13px;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.item-del:hover { background:#fbd0d0; }
-.add-form { background:var(--surf2); border:1px solid var(--border); border-radius:var(--r-sm);
-  padding:14px; display:flex; flex-direction:column; gap:10px; }
-.add-form-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-.form-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
-.form-field { display:flex; flex-direction:column; gap:4px; flex:1; min-width:120px; }
-.form-field label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
-.form-field input, .form-field select {
-  padding:8px 10px; border:1.5px solid var(--border); border-radius:var(--r-sm);
-  font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text); background:#fff; width:100%;
-}
-.form-field input:focus, .form-field select:focus { outline:none; border-color:var(--navy2); }
-.add-btn { padding:9px 16px; background:var(--navy); color:#fff; border:none; border-radius:var(--r-sm);
-  font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; }
-.add-btn:hover { background:#142a45; }
-.color-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.color-opt { width:24px; height:24px; border-radius:50%; cursor:pointer; border:2px solid transparent; flex-shrink:0; }
-.color-opt.selected { border-color:var(--text); transform:scale(1.15); }
-.setting-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
-.setting-row label { font-size:13px; font-weight:500; flex:1; min-width:100px; }
-.setting-row input { flex:2; padding:8px 10px; border:1.5px solid var(--border);
-  border-radius:var(--r-sm); font-size:13px; font-family:'DM Sans',sans-serif; }
-.save-settings-btn { width:100%; padding:10px; background:var(--ok); color:#fff; border:none;
-  border-radius:var(--r-sm); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; margin-top:6px; }
-
-/* ── MODAL ── */
-.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:500;
-  display:flex; align-items:center; justify-content:center; padding:20px;
-  opacity:0; pointer-events:none; transition:opacity .2s; }
-.modal-bg.open { opacity:1; pointer-events:all; }
-.modal { background:var(--surface); border-radius:var(--r); box-shadow:var(--sh-lg);
-  padding:26px; max-width:440px; width:100%; }
-.modal h2 { font-size:17px; font-weight:700; margin-bottom:5px; }
-.modal p  { font-size:13px; color:var(--muted); margin-bottom:18px; }
-.modal-info { background:var(--surf2); border:1px solid var(--border); border-radius:var(--r-sm);
-  padding:11px 14px; font-size:12px; margin-bottom:16px; line-height:1.6; }
-.modal-btns { display:flex; gap:8px; justify-content:flex-end; }
-
-/* ── APERÇU ── */
-.apercu-modal { max-width:680px !important; max-height:88vh; overflow-y:auto; }
-.section-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
-  color:var(--muted); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border);
-  display:flex; align-items:center; gap:7px; }
-.section-lbl .num { width:18px; height:18px; background:var(--navy); color:#fff;
-  border-radius:50%; font-size:9px; display:flex; align-items:center; justify-content:center; }
-.cmp-row { display:flex; align-items:center; gap:8px; padding:7px 11px;
-  border-radius:8px; margin-bottom:4px; border:1px solid var(--border); background:var(--surf2); }
-.cmp-row.up   { background:#DCFCE7; border-color:#BBF7D0; }
-.cmp-row.down { background:#FEE2E2; border-color:#FECACA; }
-.cmp-name { font-weight:600; font-size:12px; min-width:130px; flex-shrink:0; }
-.cmp-vals { color:var(--muted); font-size:11px; font-family:'DM Mono',monospace; flex:1; }
-.cmp-diff { font-weight:700; font-size:12px; white-space:nowrap; }
-.diff-up   { color:var(--ok); }
-.diff-down { color:var(--err); }
-.diff-neut { color:var(--muted); }
-
-/* ── SCHED CARD ── */
-.sched-card { display:flex; align-items:flex-start; gap:12px; }
-.sched-icon { font-size:22px; flex-shrink:0; margin-top:2px; }
-.sched-info h3 { font-size:13px; font-weight:600; margin-bottom:4px; }
-.sched-info p  { font-size:12px; color:var(--muted); line-height:1.5; }
-.next-send { display:inline-block; margin-top:6px; font-size:11px; font-weight:600;
-  padding:3px 10px; border-radius:20px; background:var(--warn-l); color:var(--warn); }
-
-/* ── TOASTS ── */
-.toasts { position:fixed; bottom:20px; right:20px; z-index:999;
-  display:flex; flex-direction:column; gap:7px; }
-.toast { padding:11px 16px; border-radius:var(--r-sm); font-size:13px; font-weight:500;
-  color:#fff; box-shadow:var(--sh-lg); max-width:300px; animation:tin .2s ease; }
-.toast.ok   { background:var(--ok); }
-.toast.err  { background:var(--err); }
-.toast.info { background:var(--navy); }
-.toast.warn { background:var(--warn); }
-@keyframes tin { from { transform:translateX(40px); opacity:0; } to { transform:none; opacity:1; } }
-optgroup { font-weight:700; font-style:normal; }
-
-/* ── LOADING OVERLAY ── */
-.loading-overlay { position:fixed; inset:0; background:rgba(28,53,87,.85); z-index:999;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
-.loading-overlay.hidden { display:none; }
-.spinner { width:40px; height:40px; border:4px solid rgba(255,255,255,.2);
-  border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
-.loading-msg { color:#fff; font-size:14px; font-weight:500; }
-@keyframes spin { to { transform:rotate(360deg); } }
-</style>
-</head>
-<body>
-
-<!-- ── LOADING OVERLAY ── -->
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="spinner"></div>
-  <div class="loading-msg" id="loadingMsg">Connexion à la base de données…</div>
-</div>
-
-<!-- ══════════════════════════════════════
-     PAGE CONNEXION
-═══════════════════════════════════════ -->
-<div id="loginPage" style="display:none">
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="login-logo">
-        <div class="tooth">🦷</div>
-        <h1>Clinique St-Étienne</h1>
-        <p>Feuille de temps — Connexion</p>
-      </div>
-      <div class="login-field">
-        <label>Votre nom</label>
-        <select id="loginName" onchange="onLoginNameChange()">
-          <option value="">— Sélectionnez votre nom —</option>
-        </select>
-      </div>
-      <div class="login-field" id="loginEmailField" style="display:none">
-        <label>Votre adresse courriel</label>
-        <input type="email" id="loginEmail" placeholder="prenom@exemple.com"
-          oninput="onLoginInput()" onkeydown="if(event.key==='Enter')doLogin()">
-        <p id="loginEmailHint" style="font-size:11px;color:var(--muted);margin-top:5px"></p>
-      </div>
-      <div class="login-err" id="loginErr"></div>
-      <button class="login-btn" id="loginBtn" onclick="doLogin()" disabled>
-        Connexion →
-      </button>
-      <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:14px">
-        Votre courriel est utilisé uniquement pour vous envoyer des rappels de saisie.
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     APPLICATION PRINCIPALE
-═══════════════════════════════════════ -->
-<div id="appPage" style="display:none">
-
-<header>
-  <div class="h-brand">
-    <div class="h-logo">🦷</div>
-    <div>
-      <div class="h-title">Clinique St-Étienne</div>
-      <div class="h-sub">Feuille de temps</div>
-    </div>
-  </div>
-  <div class="h-right">
-    <span class="h-sync" id="syncIndicator"></span>
-    <div class="h-clock" id="hClock"></div>
-    <div class="h-user">
-      <span class="h-user-name" id="headerUserName"></span>
-      <button class="h-admin-btn" id="adminBtn" onclick="openAdmin()" style="display:none">⚙ Config</button>
-      <button class="h-logout" onclick="doLogout()">Déconnexion</button>
-    </div>
-  </div>
-</header>
-
-<div class="main">
-
-  <!-- Schedule info -->
-  <div class="card">
-    <div class="sched-card">
-      <div class="sched-icon">📅</div>
-      <div class="sched-info">
-        <h3>Envoi automatique aux 2 semaines</h3>
-        <p>Le fichier de paie est envoyé à <strong id="schedEmail">—</strong> chaque lundi à 15h00.
-        Un rappel vous sera envoyé la veille à 18h00 si des heures sont manquantes.</p>
-        <span class="next-send" id="nextSendLabel">Prochain envoi : —</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Period -->
-  <div class="card">
-    <div class="period-bar">
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="nav-btn" onclick="changePeriod(-1)">‹</button>
-        <div class="period-label">
-          <span class="badge badge-navy" id="periodBadge">—</span>
-          <span id="periodRange">—</span>
-          <span id="periodStatusBadge" style="display:none"></span>
-        </div>
-        <button class="nav-btn" onclick="changePeriod(1)">›</button>
-      </div>
-      <span class="due-lbl" id="dueLbl"></span>
-    </div>
-  </div>
-
-  <!-- Locked banner -->
-  <div class="card locked-banner" id="lockedBanner" style="display:none">
-    <div class="locked-icon">🔒</div>
-    <div class="locked-text">
-      <h3>Période verrouillée</h3>
-      <p id="lockedMsg">Cette période a déjà été envoyée.</p>
-    </div>
-  </div>
-
-
-
-  <!-- Days -->
-  <div id="daysGrid"></div>
-
-  <!-- Actions -->
-  <div class="actions" id="actionsBar" style="display:none">
-    <button class="btn btn-primary" onclick="showApercu()">🔍 Aperçu avant envoi</button>
-    <button class="btn btn-send" id="adminSendBtn" onclick="showSendModal()" style="display:none">📧 Envoyer par courriel</button>
-    <button class="btn btn-danger" onclick="clearPeriod()">✕ Effacer mes entrées</button>
-  </div>
-
-  <!-- Weekly summary -->
-  <div class="card" id="weekSummary" style="display:none; margin-top:16px;">
-    <div style="font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-      📋 Récapitulatif de la période
-    </div>
-    <div class="sum-table-wrap">
-      <table class="sum-table">
-        <thead><tr id="sumThead"></tr></thead>
-        <tbody id="sumBody"></tbody>
-        <tfoot><tr class="tot-row" id="sumTfoot"></tr></tfoot>
-      </table>
-    </div>
-  </div>
-
-</div><!-- /.main -->
-
-<!-- Admin panel -->
-<div class="admin-overlay" id="adminOverlay" onclick="closeAdminIfBg(event)">
-  <div class="admin-panel" id="adminPanel">
-    <div class="admin-hdr">
-      <h2>⚙ Configuration</h2>
-      <button class="admin-close" onclick="closeAdmin()">✕</button>
-    </div>
-    <div class="admin-tabs">
-      <div class="admin-tab active" onclick="switchAdminTab('employees')" id="tab-employees">👥 Employées</div>
-      <div class="admin-tab" onclick="switchAdminTab('dentists')" id="tab-dentists">🦷 Dentistes</div>
-      <div class="admin-tab" onclick="switchAdminTab('settings')" id="tab-settings">📧 Paramètres</div>
-      <div class="admin-tab" onclick="switchAdminTab('reminders')" id="tab-reminders">🔔 Rappels</div>
-    </div>
-    <div class="admin-body">
-      <!-- EMPLOYEES -->
-      <div id="panel-employees">
-        <div class="admin-section">
-          <h3>Employées</h3>
-          <div class="item-list" id="empList"></div>
-        </div>
-        <div class="admin-section">
-          <div class="add-form">
-            <div class="add-form-title">+ Ajouter une employée</div>
-            <div class="form-row">
-              <div class="form-field">
-                <label>Nom</label>
-                <input type="text" id="newEmpName" placeholder="ex: Marie Tremblay">
-              </div>
-              <div class="form-field">
-                <label>Catégorie</label>
-                <select id="newEmpCat">
-                  <option value="Administration">Administration</option>
-                  <option value="Assistante">Assistante</option>
-                  <option value="Hygiéniste">Hygiéniste</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-field">
-              <label>Courriel</label>
-              <input type="email" id="newEmpEmail" placeholder="prenom@exemple.com">
-            </div>
-            <button class="add-btn" onclick="addEmployee()">Ajouter</button>
-          </div>
-        </div>
-      </div>
-      <!-- DENTISTS -->
-      <div id="panel-dentists" style="display:none">
-        <div class="admin-section">
-          <h3>Dentistes</h3>
-          <div class="item-list" id="dentList"></div>
-        </div>
-        <div class="admin-section">
-          <div class="add-form">
-            <div class="add-form-title">+ Ajouter un(e) dentiste</div>
-            <div class="form-row">
-              <div class="form-field"><label>Nom court</label><input type="text" id="newDentName" placeholder="Dre Beauchamp"></div>
-              <div class="form-field"><label>Nom complet</label><input type="text" id="newDentFull" placeholder="Dre Sophie Beauchamp"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-field"><label>Clé</label><input type="text" id="newDentKey" placeholder="SB"></div>
-              <div class="form-field" style="flex:2">
-                <label>Couleur</label>
-                <div class="color-row" id="colorPicker">
-                  <span class="color-opt selected" data-color="#1F4E79" style="background:#1F4E79"></span>
-                  <span class="color-opt" data-color="#375623" style="background:#375623"></span>
-                  <span class="color-opt" data-color="#843C0C" style="background:#843C0C"></span>
-                  <span class="color-opt" data-color="#5B2C8B" style="background:#5B2C8B"></span>
-                  <span class="color-opt" data-color="#0F766E" style="background:#0F766E"></span>
-                  <span class="color-opt" data-color="#374151" style="background:#374151"></span>
-                  <span class="color-opt" data-color="#7C3AED" style="background:#7C3AED"></span>
-                  <span class="color-opt" data-color="#2E7D32" style="background:#2E7D32"></span>
-                </div>
-              </div>
-            </div>
-            <button class="add-btn" onclick="addDentist()">Ajouter</button>
-          </div>
-        </div>
-      </div>
-      <!-- SETTINGS -->
-      <div id="panel-settings" style="display:none">
-        <div class="admin-section">
-          <h3>Courriel d'envoi</h3>
-          <div class="setting-row"><label>Adresse :</label><input type="email" id="settingEmail"></div>
-        </div>
-        <div class="admin-section">
-          <h3>Calendrier</h3>
-          <div class="setting-row"><label>Date début (1ère période) :</label><input type="date" id="settingAnchor"></div>
-        </div>
-        <button class="save-settings-btn" onclick="saveSettings()">✓ Enregistrer</button>
-      </div>
-      <!-- REMINDERS -->
-      <div id="panel-reminders" style="display:none">
-        <div class="admin-section">
-          <h3>Rappels automatiques</h3>
-          <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">
-            Un courriel de rappel est envoyé automatiquement la veille de la date de verrouillage (dimanche à 18h00)
-            à toutes les employées qui ont des journées sans heures saisies.
-          </p>
-          <button class="add-btn" style="width:100%;margin-bottom:10px" onclick="sendTestReminder()">
-            📧 Envoyer un rappel de test maintenant
-          </button>
-          <div id="reminderLog" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
-        </div>
-        <div class="admin-section">
-          <h3>Courriels enregistrés</h3>
-          <div id="emailList" style="font-size:12px;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Conflit modal -->
-<div class="modal-bg" id="conflictModal">
-  <div class="modal" style="max-width:520px">
-    <h2 style="color:var(--err)">🚫 Envoi bloqué — Conflits d'horaire</h2>
-    <p>L'envoi est impossible tant que les conflits suivants ne sont pas corrigés. Contactez les employées concernées.</p>
-    <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:16px;max-height:300px;overflow-y:auto">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--err);margin-bottom:8px">
-        ⚠ Conflits détectés
-      </div>
-      <div id="conflictList"></div>
-    </div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
-      Chaque employée concernée doit corriger ses horaires dans l'application avant que l'envoi soit possible.
-    </p>
-    <div class="modal-btns">
-      <button class="btn btn-sec" onclick="closeConflictModal()">Fermer</button>
-    </div>
-  </div>
-</div>
-
-<!-- Send modal -->
-<div class="modal-bg" id="sendModal">
-  <div class="modal">
-    <h2>📧 Envoyer la feuille de paie</h2>
-    <p>Le fichier Excel sera généré et votre client courriel s'ouvrira.</p>
-    <div class="modal-info">
-      <b>Destinataire :</b> <span id="mEmail">—</span><br>
-      <b>Période :</b> <span id="mPeriod">—</span><br>
-      <b>Entrées valides :</b> <span id="mCount">—</span>
-    </div>
-    <div class="modal-btns">
-      <button class="btn btn-sec" onclick="closeModal()">Annuler</button>
-      <button class="btn btn-send" onclick="doSend()">✓ Confirmer l'envoi</button>
-    </div>
-  </div>
-</div>
-
-<!-- Aperçu modal -->
-<div class="modal-bg" id="apercuModal">
-  <div class="modal apercu-modal">
-    <h2>🔍 Aperçu avant envoi</h2>
-    <p>Vérification des entrées et comparaison avec la période précédente.</p>
-    <div id="apercuErrors" style="display:none;margin-bottom:12px">
-      <div style="background:var(--err-l);border:1.5px solid var(--err);border-radius:8px;padding:12px 14px">
-        <div style="font-size:13px;font-weight:700;color:var(--err);margin-bottom:6px">⚠ Entrées incomplètes</div>
-        <div id="apercuErrorList" style="font-size:12px;color:var(--err)"></div>
-      </div>
-    </div>
-    <div id="apercuOk" style="display:none;background:var(--ok-l);border:1px solid var(--ok);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--ok);margin-bottom:12px">
-      ✓ Toutes les entrées sont complètes et valides.
-    </div>
-    <div class="section-lbl"><span class="num">2</span> Période courante — <span id="apercuPeriodLabel"></span></div>
-    <div class="sum-table-wrap">
-      <table class="sum-table" style="min-width:380px">
-        <thead><tr id="apercuThead"></tr></thead>
-        <tbody id="apercuTbody"></tbody>
-        <tfoot><tr id="apercuTfoot" style="font-weight:700;background:var(--surf2)"></tr></tfoot>
-      </table>
-    </div>
-    <div id="apercuCompareSection">
-      <div class="section-lbl"><span class="num">3</span> Comparaison par employée — période précédente</div>
-      <div id="apercuCompare"></div>
-    </div>
-    <div class="modal-btns" style="margin-top:16px">
-      <button class="btn btn-sec" onclick="closeApercu()">Fermer</button>
-      <button class="btn btn-send" id="apercuSendBtn" onclick="closeApercu();showSendModal()">📧 Procéder à l'envoi</button>
-    </div>
-  </div>
-</div>
-
-</div><!-- /#appPage -->
-
-<div class="toasts" id="toasts"></div>
-
-<script>
-// ═══════════════════════════════════════════════════════════════
-//  SUPABASE
-// ═══════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://jurtntqtitbefdvyetyz.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1cnRudHF0aXRiZWZkdnlldHl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNjk2MDUsImV4cCI6MjA5MzY0NTYwNX0.Lt2HlYD5VyfB6aM_T5IpoFAWwB4r62Q2ZQ8PKxMJlIY';
-const RESEND_KEY   = 're_BvmzJrTS_Gv4YwLkyh6wMTPsWJo7amSUf';
-
-async function sbFetch(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer ?? 'return=representation',
-      ...(opts.extraHeaders||{})
-    },
-    method: opts.method || 'GET',
-    body: opts.body || undefined
-  });
-  if (!res.ok) { const t=await res.text(); throw new Error(`${res.status}: ${t}`); }
-  const txt = await res.text(); return txt ? JSON.parse(txt) : [];
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  DEFAULT DATA
-// ═══════════════════════════════════════════════════════════════
-const DEFAULT_EMPLOYEES = [
-  { name:'Anne G.',              cat:'Administration', email:'' },
-  { name:'Anne G. 2e soir',      cat:'Administration', email:'' },
-  { name:'Annick',               cat:'Administration', email:'' },
-  { name:'Annick 2e soir',       cat:'Administration', email:'' },
-  { name:'Céline',               cat:'Administration', email:'' },
-  { name:'Céline 2e soir',       cat:'Administration', email:'' },
-  { name:'Josée',                cat:'Administration', email:'' },
-  { name:'Josée 2e soir',        cat:'Administration', email:'' },
-  { name:'Marie Claude',         cat:'Administration', email:'' },
-  { name:'Marie Claude 2e soir', cat:'Administration', email:'' },
-  { name:'Nancy P.',             cat:'Administration', email:'' },
-  { name:'Nancy P. 2e soir',     cat:'Administration', email:'' },
-  { name:'Philippe Girard',      cat:'Administration', email:'' },
-  { name:'Philippe Girard 2e soir', cat:'Administration', email:'' },
-  { name:'Audrey Demers',        cat:'Assistante', email:'' },
-  { name:'Audrey Demers 2e soir',cat:'Assistante', email:'' },
-  { name:'Élizabeth',            cat:'Assistante', email:'' },
-  { name:'Élizabeth 2e soir',    cat:'Assistante', email:'' },
-  { name:'Éléonore',             cat:'Assistante', email:'' },
-  { name:'Éléonore 2e soir',     cat:'Assistante', email:'' },
-  { name:'Isabelle',             cat:'Assistante', email:'' },
-  { name:'Isabelle 2e soir',     cat:'Assistante', email:'' },
-  { name:'Mélissa',              cat:'Assistante', email:'' },
-  { name:'Mélissa 2e soir',      cat:'Assistante', email:'' },
-  { name:'Nancy Guillemette',    cat:'Assistante', email:'' },
-  { name:'Nancy Guillemette 2e soir', cat:'Assistante', email:'' },
-  { name:'Chantal',              cat:'Hygiéniste', email:'' },
-  { name:'Chantal 2e soir',      cat:'Hygiéniste', email:'' },
-  { name:'Jessica',              cat:'Hygiéniste', email:'' },
-  { name:'Jessica 2e soir',      cat:'Hygiéniste', email:'' },
-  { name:'Lison',                cat:'Hygiéniste', email:'' },
-  { name:'Lison 2e soir',        cat:'Hygiéniste', email:'' },
-  { name:'Manon',                cat:'Hygiéniste', email:'' },
-  { name:'Manon 2e soir',        cat:'Hygiéniste', email:'' },
-  { name:'Marie-Ève M.',         cat:'Hygiéniste', email:'' },
-  { name:'Marie-Ève M. 2e soir', cat:'Hygiéniste', email:'' },
-  { name:'Marilyn',              cat:'Hygiéniste', email:'' },
-  { name:'Marilyn 2e soir',      cat:'Hygiéniste', email:'' },
-  { name:'Mélanie',              cat:'Hygiéniste', email:'' },
-  { name:'Mélanie 2e soir',      cat:'Hygiéniste', email:'' },
-  { name:'Myriam',               cat:'Hygiéniste', email:'' },
-  { name:'Myriam 2e soir',       cat:'Hygiéniste', email:'' },
-  { name:'Nancy V.',             cat:'Hygiéniste', email:'' },
-  { name:'Nancy V. 2e soir',     cat:'Hygiéniste', email:'' },
-  { name:'Sabrina',              cat:'Hygiéniste', email:'' },
-  { name:'Sabrina 2e soir',      cat:'Hygiéniste', email:'' },
-];
-
-const DEFAULT_DENTISTS = [
-  { key:'MMM',   short:'Dre Moreau',  full:'Dre Marie-Michèle Moreau', color:'#B8860B', light:'#FFF9C4' },
-  { key:'CG',    short:'Dre Gagnon',  full:'Dre Catherine Gagnon',      color:'#1565C0', light:'#BBDEFB' },
-  { key:'MC',    short:'Dre Côté',    full:'Dre Marie Côté',             color:'#E65100', light:'#FFE0B2' },
-  { key:'Aym',   short:'Dr Bherer',   full:'Dr Aymeric Bherer',          color:'#546E7A', light:'#ECEFF1' },
-  { key:'Kelly', short:'Dre Grondin', full:'Dre Kelly-Ann Grondin',      color:'#2E7D32', light:'#C8E6C9' },
-  { key:'ADMIN',    short:'Administration', full:'Administration', color:'#374151', light:'#F3F4F6' },
-  { key:'FORMATION',short:'Formation',      full:'Formation',      color:'#6A0DAD', light:'#EDE7F6' },
-];
-
-const DEFAULT_SETTINGS = {
-  email: 'gestionstetienne@gmail.com',
-  anchorDate: '2026-05-04',
+// ── PALETTE ───────────────────────────────────────────────────
+const C = {
+  navy:"#1a2744", navyL:"#243360", teal:"#2a7f7f", gold:"#c9a84c", goldL:"#e2c06e",
+  cream:"#f8f5ef", white:"#ffffff", gray:"#e8e3d9",
+  textD:"#1a2744", textM:"#4a5568", textL:"#718096",
+  red:"#c0392b", orange:"#e67e22", green:"#27ae60",
+  redP:"#fdf2f1", orangeP:"#fef9f4", greenP:"#f0faf4",
 };
+const ECOLS = ["#2a7f7f","#c9a84c","#c0392b","#8e44ad","#2980b9","#e67e22","#27ae60","#1a2744"];
+const BASE_RATES = [24,26,27,28,29];
+const ANC_LABELS = ["0–5 ans","5–10 ans","10–15 ans","15–20 ans","20+ ans"];
+const STORE_KEY = "cds_ste_persist_v1";
 
-const ADMIN_EMAIL = 'gestionstetienne@gmail.com'; // seul ce compte voit le bouton Envoyer
+const DEFAULT_EVALUATORS = [
+  {id:"ev1",name:"Catherine Gagnon",role:"Dentiste"},
+  {id:"ev2",name:"Marie-Michèle Moreau",role:"Dentiste"},
+  {id:"ev3",name:"Marie Côté",role:"Dentiste"},
+  {id:"ev4",name:"Aymeric Bherer",role:"Dentiste"},
+  {id:"ev5",name:"Kelly-Ann Grondin",role:"Dentiste"},
+  {id:"ev6",name:"Philippe Girard",role:"Gestionnaire clinique"},
+  {id:"ev7",name:"Autre",role:""},
+];
 
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-let employees = [], dentists = [], settings = {};
-let currentPeriodIndex = 0;
-let currentEmployee = '';
-let currentUserEmail = '';
-let isAdmin = false;
+const LEVELS_DATA = [
+  {id:1,title:"Accueil & coordination de base",bonus:1,tbd:false,sections:[
+    {title:"Accueil & communication",tasks:["Répondre aux appels entrants et gérer la messagerie vocale","Accueillir les patients à leur arrivée et gérer le registre d'arrivée","Transmettre les messages aux membres de l'équipe","Renseigner les patients sur les services et procédures générales"]},
+    {title:"Gestion des rendez-vous",tasks:["Planifier, confirmer, modifier et annuler les rendez-vous","Effectuer les rappels de rendez-vous (téléphone, texto, courriel)","Gérer les listes d'attente et les remplacements de dernière minute","Optimiser l'horaire pour maximiser l'utilisation des salles"]},
+    {title:"Dossiers, facturation & soumissions",tasks:["Ouvrir, mettre à jour et archiver les dossiers patients","Saisir les actes et les notes au dossier après la consultation","Produire et remettre les factures aux patients","Encaisser les paiements (comptant, carte, chèque)","Soumettre les réclamations aux assurances privées par voie électronique","Soumettre les factures RAMQ (enfants -10 ans, carnet de réclamation)","Soumettre les réclamations RCSD (Régime canadien de soins dentaires)"]},
+  ]},
+  {id:2,title:"Clôture financière quotidienne & dépôts",bonus:2,tbd:false,sections:[
+    {title:"Clôture de journée",tasks:["Effectuer la réconciliation de caisse en fin de journée","Préparer le rapport de fermeture quotidienne (production, encaissements)","Identifier et signaler les écarts de caisse","Assurer le suivi des paiements partiels et soldes de comptes patients"]},
+    {title:"Dépôts bancaires",tasks:["Préparer et effectuer les dépôts bancaires","Vérifier la concordance entre les dépôts et les rapports de caisse","Conserver et classer les bordereaux de dépôt"]},
+    {title:"Suivi des assurances privées",tasks:["Assurer le suivi des réclamations refusées ou en attente","Communiquer avec les assureurs pour les demandes de précision","Mettre à jour les informations d'assurance dans les dossiers patients"]},
+  ]},
+  {id:3,title:"Gestion financière & comptes à recevoir",bonus:3,tbd:false,sections:[
+    {title:"Comptes à recevoir",tasks:["Assurer le suivi rigoureux des comptes à recevoir","Relancer les patients pour les soldes impayés (lettres, appels)","Gérer les arrangements de paiement et les plans échelonnés","Préparer les rapports de comptes à recevoir"]},
+    {title:"Paiements non utilisés & remboursements",tasks:["Gérer les paiements non utilisés et les crédits en compte patient","Effectuer les remboursements aux patients (trop-perçus, annulations)","Tenir le registre des transactions en suspens","Réconcilier les crédits dans le logiciel de gestion dentaire"]},
+  ]},
+  {id:4,title:"Coordination avancée & programmes publics",bonus:4,tbd:false,sections:[
+    {title:"Suivi RAMQ & RCSD",tasks:["Assurer le suivi des factures RAMQ refusées, en attente ou en révision","Gérer les demandes de pièces justificatives de la RAMQ","Assurer le suivi des réclamations RCSD et coordonner les préautorisations","Effectuer la saisie comptable liée aux programmes publics","Se tenir à jour sur les modifications aux programmes RAMQ et RCSD"]},
+    {title:"Orthodontie & plans de traitement",tasks:["Gérer les dossiers d'orthodontie : contrats, échéanciers, suivi pluriannuel","Coordonner les plans de traitement multi-étapes avec le dentiste","Assurer le suivi des plans de traitement et relancer les patients","Préparer et présenter les estimés de coût aux patients","Gérer les soumissions d'assurance pour traitements spécialisés"]},
+    {title:"Gestion avancée de l'horaire",tasks:["Effectuer les modifications au manuel horaire (gabarits, configurations)","Optimiser les blocs de production selon les objectifs de la clinique","Coordonner les horaires de plusieurs praticiens"]},
+  ]},
+  {id:5,title:"Gestion & coordination de clinique",bonus:null,tbd:true,sections:[
+    {title:"Gestion des opérations",tasks:["Superviser le bon fonctionnement quotidien de la clinique","Élaborer, mettre à jour et faire respecter les procédures internes","Assurer le respect des normes d'hygiène, sécurité et confidentialité","Coordonner les fournisseurs de services (équipements, TI, entretien)","Transmettre les rapports de facturation au dentiste responsable"]},
+    {title:"Ressources humaines",tasks:["Participer au recrutement, à la sélection et à l'intégration du personnel","Gérer les horaires de travail et planifier les remplacements","Assurer le suivi des évaluations de rendement et des objectifs","Gérer les communications internes et faciliter la résolution de conflits","Veiller à la formation continue et à l'intégration des nouvelles procédures"]},
+    {title:"Gestion comptable & financière",tasks:["Préparer les sommaires financiers hebdomadaires et mensuels","Produire les rapports de production et d'analyse de performance","Faire le lien avec le comptable externe","Superviser la facturation, les dépôts et les comptes à recevoir","Participer à la préparation des budgets et au suivi des dépenses"]},
+    {title:"Marketing, achats & projets spéciaux",tasks:["Gérer les réseaux sociaux et le site web de la clinique","Coordonner les campagnes de fidélisation et de communication","Gérer les commandes de fournitures et négocier avec les fournisseurs","Coordonner les projets de développement ou de transformation","Piloter l'implantation de nouveaux logiciels ou procédures"]},
+  ]},
+];
 
-// Cache mémoire : { "p{idx}_{name}": { dayIdx: [segs] } }
-const _cache = {};
-const _syncTimers = {};
+// ── HELPERS ───────────────────────────────────────────────────
+const todayISO = () => new Date().toISOString().slice(0,10);
+const fmtD = d => { if(!d) return "—"; const dt=new Date(d+"T00:00:00"); const days=["dim","lun","mar","mer","jeu","ven","sam"]; const mo=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."]; return `${days[dt.getDay()]} ${dt.getDate()} ${mo[dt.getMonth()]} ${dt.getFullYear()}`; };
+const fmtS = d => { if(!d) return "—"; const dt=new Date(d+"T00:00:00"); return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`; };
+const scoreOf = tasks => { const v=Object.values(tasks); const ev=v.filter(t=>t.appr); return {total:ev.length, at:ev.filter(t=>t.appr==="at").length, ok:ev.filter(t=>t.appr==="ok").length, ex:ev.filter(t=>t.appr==="ex").length}; };
+const pct = (n,t) => t>0 ? Math.round(n/t*100) : 0;
+const overlaps = (s1,e1,s2,e2) => s1<=e2 && e1>=s2;
+const tkey = (lid,st,i) => `${lid}_${st.replace(/[^a-z0-9]/gi,"_")}_${i}`;
+const buildBlankTasks = () => { const t={}; LEVELS_DATA.forEach(l=>l.sections.forEach(s=>s.tasks.forEach((task,i)=>{ t[tkey(l.id,s.title,i)]={appr:null,comment:"",lvlId:l.id,label:task}; }))); return t; };
+const empColor = (i) => ECOLS[i % ECOLS.length];
 
-// ── Config (localStorage) ──
-function loadConfig() {
-  try { employees = JSON.parse(localStorage.getItem('cfg_employees')) || DEFAULT_EMPLOYEES; } catch { employees = [...DEFAULT_EMPLOYEES]; }
-  try { dentists  = JSON.parse(localStorage.getItem('cfg_dentists'))  || DEFAULT_DENTISTS;  } catch { dentists  = [...DEFAULT_DENTISTS];  }
-  try { settings  = JSON.parse(localStorage.getItem('cfg_settings'))  || DEFAULT_SETTINGS;  } catch { settings  = {...DEFAULT_SETTINGS};  }
-  // Migration: ADMIN/FORMATION
-  ['ADMIN','FORMATION'].forEach(k => { if (!dentists.find(d=>d.key===k)) { const d=DEFAULT_DENTISTS.find(x=>x.key===k); if(d) dentists.push(d); } });
-}
-function saveConfig() {
-  localStorage.setItem('cfg_employees', JSON.stringify(employees));
-  localStorage.setItem('cfg_dentists',  JSON.stringify(dentists));
-  localStorage.setItem('cfg_settings',  JSON.stringify(settings));
-}
-
-// ── Segments (Supabase + cache) ──
-function ck(pi,en) { return `p${pi}_${en}`; }
-
-async function loadEmpPeriod(pi, empName) {
-  const k = ck(pi, empName);
-  if (_cache[k] && Object.keys(_cache[k]).length > 0) return _cache[k];
-
-  // Essayer localStorage d'abord (données saisies localement)
-  try {
-    const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-    if (local && Object.keys(local).length > 0) {
-      _cache[k] = local;
-    }
-  } catch(e) {}
-
-  // Essayer Supabase (données partagées)
-  try {
-    setSync('Chargement…');
-    const rows = await sbFetch(`saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&order=day_index,seg_index`);
-    if (rows.length > 0) {
-      const data = {};
-      rows.forEach(r => {
-        if (!data[r.day_index]) data[r.day_index] = [];
-        while (data[r.day_index].length <= r.seg_index)
-          data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
-        data[r.day_index][r.seg_index] = {
-          entree:r.entree||'', sortie:r.sortie||'',
-          pause:String(r.pause||0), dentist:r.dentist||'',
-          is2eSoir:r.is_2e_soir||false
-        };
-      });
-      _cache[k] = data;
-      // Sync vers localStorage
-      try { localStorage.setItem(`paie_${k}`, JSON.stringify(data)); } catch(e) {}
-    }
-    setSync('');
-  } catch(e) {
-    console.error('loadEmpPeriod:', e);
-    setSync('⚠ Hors ligne');
-  }
-  return _cache[k] || {};
-}
-
-function getEmpDaySegs(pi, empName, di) {
-  return (_cache[ck(pi,empName)]?.[di]) || [];
-}
-
-function setEmpDaySegs(pi, empName, di, segs) {
-  const k = ck(pi,empName);
-  if (!_cache[k]) _cache[k] = {};
-  _cache[k][di] = segs;
-  try { localStorage.setItem(`paie_${k}`, JSON.stringify(_cache[k])); } catch {}
-  clearTimeout(_syncTimers[`${k}_${di}`]);
-  _syncTimers[`${k}_${di}`] = setTimeout(() => syncDay(pi, empName, di, segs), 900);
-}
-
-async function syncDay(pi, empName, di, segs) {
-  setSync('Sauvegarde…');
-  try {
-    if (segs.length === 0) {
-      await sbFetch(`saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}`,
-        { method:'DELETE', prefer:'' });
-    } else {
-      const rows = segs.map((s,si) => ({
-        periode_index:pi, emp_name:empName, day_index:di, seg_index:si,
-        entree:s.entree||null, sortie:s.sortie||null, pause:parseInt(s.pause)||0,
-        dentist:s.dentist||null, is_2e_soir:s.is2eSoir||false,
-        updated_at:new Date().toISOString()
-      }));
-      await sbFetch('saisies', { method:'POST', prefer:'resolution=merge-duplicates', body:JSON.stringify(rows) });
-      if (segs.length < 10)
-        await sbFetch(`saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}&seg_index=gte.${segs.length}`,
-          { method:'DELETE', prefer:'' });
-    }
-    setSync('✓ Sauvegardé', true);
-  } catch(e) { console.error(e); setSync('⚠ Hors ligne — sauvegardé localement'); }
-}
-
-async function loadAllPeriod(pi) {
-  try {
-    const rows = await sbFetch(`saisies?periode_index=eq.${pi}&order=emp_name,day_index,seg_index`);
-    const byEmp = {};
-    rows.forEach(r => {
-      if (!byEmp[r.emp_name]) byEmp[r.emp_name] = {};
-      if (!byEmp[r.emp_name][r.day_index]) byEmp[r.emp_name][r.day_index] = [];
-      while (byEmp[r.emp_name][r.day_index].length <= r.seg_index)
-        byEmp[r.emp_name][r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
-      byEmp[r.emp_name][r.day_index][r.seg_index] = {
-        entree:r.entree||'',sortie:r.sortie||'',pause:String(r.pause||0),dentist:r.dentist||'',is2eSoir:r.is_2e_soir||false
-      };
-    });
-    // Mettre à jour le cache SEULEMENT si Supabase a des données pour cet employé
-    // Ne pas écraser le cache localStorage avec des données vides
-    Object.entries(byEmp).forEach(([n,d]) => {
-      if (Object.keys(d).length > 0) _cache[ck(pi,n)] = d;
-    });
-    // Pour les employés non trouvés dans Supabase, charger depuis localStorage
-    employees.forEach(emp => {
-      const k = ck(pi, emp.name);
-      if (!_cache[k] || Object.keys(_cache[k]).length === 0) {
-        try {
-          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-          if (local && Object.keys(local).length > 0) _cache[k] = local;
-        } catch(e) {}
-      }
-    });
-    return byEmp;
-  } catch(e) {
-    console.error(e);
-    // En cas d'erreur Supabase, charger tout depuis localStorage
-    employees.forEach(emp => {
-      const k = ck(pi, emp.name);
-      if (!_cache[k]) {
-        try {
-          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-          if (local) _cache[k] = local;
-        } catch(e2) {}
-      }
-    });
-    return {};
-  }
-}
-
-function isSent(idx) { return !!localStorage.getItem(`sent_${idx}`); }
-function getSentInfo(idx) { try { return JSON.parse(localStorage.getItem(`sent_${idx}`)); } catch { return null; } }
-async function markSent(idx) {
-  const info = { sentAt:new Date().toISOString(), email:settings.email };
-  localStorage.setItem(`sent_${idx}`, JSON.stringify(info));
-  try {
-    await sbFetch('periodes_envoyees', {
-      method:'POST', prefer:'resolution=merge-duplicates',
-      body:JSON.stringify({ periode_index:idx, sent_at:info.sentAt, email:info.email, sent_by:currentEmployee })
-    });
-  } catch(e) { console.error(e); }
-}
-
-function setSync(msg, brief=false) {
-  const el = document.getElementById('syncIndicator'); if (!el) return;
-  el.textContent = msg;
-  el.style.color = brief ? '#86EFAC' : 'rgba(255,255,255,.6)';
-  if (brief) setTimeout(() => { el.textContent=''; }, 2500);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  LOGIN / LOGOUT
-// ═══════════════════════════════════════════════════════════════
-
-
-function populateLoginSelector() {
-  const sel = document.getElementById('loginName');
-  sel.innerHTML = '<option value="">— Sélectionnez votre nom —</option>';
-  const cats = ['Administration','Assistante','Hygiéniste'];
-  cats.forEach(cat => {
-    // Afficher seulement les noms de base (sans "2e soir")
-    const group = employees.filter(e => e.cat===cat && !e.name.includes('2e soir'));
-    if (!group.length) return;
-    const og = document.createElement('optgroup');
-    og.label = cat;
-    group.forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e.name; opt.textContent = e.name; og.appendChild(opt);
-    });
-    sel.appendChild(og);
-  });
-}
-
-function onLoginNameChange() {
-  const name = document.getElementById('loginName').value;
-  const emailField = document.getElementById('loginEmailField');
-  const emailInput = document.getElementById('loginEmail');
-  const emailHint  = document.getElementById('loginEmailHint');
-
-  if (!name) {
-    document.getElementById('loginBtn').disabled = true;
-    emailField.style.display = 'none';
-    return;
-  }
-
-  const emp = employees.find(e => e.name === name);
-  const knownEmail = emp?.email || '';
-
-  if (knownEmail) {
-    // Courriel déjà connu — pré-remplir et masquer le champ (lecture seule)
-    emailInput.value = knownEmail;
-    emailField.style.display = 'block';
-    if (emailHint) emailHint.textContent = `✓ Courriel associé : ${knownEmail}`;
-    emailInput.style.background = '#F0F7FF';
-    emailInput.style.color = '#1C3557';
-    emailInput.readOnly = true;
-  } else {
-    // Première connexion — afficher le champ vide
-    emailInput.value = '';
-    emailInput.readOnly = false;
-    emailInput.style.background = '';
-    emailInput.style.color = '';
-    emailField.style.display = 'block';
-    if (emailHint) emailHint.textContent = 'Première connexion — votre courriel sera mémorisé pour les rappels.';
-  }
-  onLoginInput();
-}
-
-function onLoginInput() {
-  const name  = document.getElementById('loginName').value;
-  const email = document.getElementById('loginEmail').value.trim();
-  const valid = name && email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  document.getElementById('loginBtn').disabled = !valid;
-}
-
-async function doLogin() {
-  const name  = document.getElementById('loginName').value;
-  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-  if (!name || !email) return;
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'Connexion…';
-
-  // Vérifier / enregistrer le courriel
-  const emp = employees.find(e => e.name === name);
-  if (emp) {
-    if (emp.email && emp.email !== email) {
-      showLoginErr(`Ce courriel ne correspond pas à celui enregistré pour ${name}. Contactez l'administrateur.`);
-      btn.disabled = false; btn.textContent = 'Connexion →'; return;
-    }
-    if (!emp.email) {
-      emp.email = email; saveConfig();
+// ── PERSISTENT STORAGE ────────────────────────────────────────
+// Uses window.storage (Claude artifact persistent storage) with localStorage as fallback
+const storage = {
+  async get() {
+    // Try window.storage first (Claude artifact persistent storage)
+    if (typeof window !== "undefined" && window.storage) {
       try {
-        await sbFetch('employe_emails', {
-          method:'POST', prefer:'resolution=merge-duplicates',
-          body: JSON.stringify({ emp_name: name, email })
-        });
-      } catch(e) { console.warn('Could not save email:', e); }
+        const r = await window.storage.get(STORE_KEY);
+        if (r) return JSON.parse(r.value);
+      } catch(e) {}
     }
-  }
-
-  // Session — toujours le nom de base (pas de 2e soir à la connexion)
-  currentEmployee  = name;
-  currentUserEmail = email;
-  isAdmin = email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
-  showApp();
-}
-
-function doLogout() {
-  currentEmployee = ''; currentUserEmail = ''; isAdmin = false;
-  document.getElementById('loginEmail').value='';
-  document.getElementById('loginName').value='';
-  document.getElementById('loginErr').style.display='none';
-  document.getElementById('loginBtn').disabled=true;
-  document.getElementById('loginBtn').textContent='Connexion →';
-  document.getElementById('appPage').style.display='none';
-  document.getElementById('loginPage').style.display='';
-}
-
-function showLoginErr(msg) {
-  const el = document.getElementById('loginErr');
-  el.textContent = msg; el.style.display = 'block';
-}
-
-async function showApp() {
-  document.getElementById('loginPage').style.display='none';
-  document.getElementById('appPage').style.display='';
-  document.getElementById('headerUserName').textContent = currentEmployee;
-  document.getElementById('adminBtn').style.display = isAdmin ? '' : 'none';
-  document.getElementById('adminSendBtn').style.display = isAdmin ? '' : 'none';
-  document.getElementById('schedEmail').textContent = settings.email;
-
-  // Charger les périodes envoyées
-  try {
-    const rows = await sbFetch('periodes_envoyees');
-    rows.forEach(r => localStorage.setItem(`sent_${r.periode_index}`,
-      JSON.stringify({sentAt:r.sent_at, email:r.email})));
-  } catch(e) {}
-
-  currentPeriodIndex = currentPeriodIdxForNow();
-  updateClock(); setInterval(updateClock, 30000);
-  updatePeriodUI(); updateNextSendLabel();
-  injectDentistColors();
-  initColorPicker();
-
-  // Charger les données fraîches depuis Supabase à chaque connexion
-  showLoadingOverlay('Chargement de vos données…');
-  // Vider le cache pour forcer rechargement depuis Supabase
-  delete _cache[ck(currentPeriodIndex, currentEmployee)];
-  if (currentPeriodIndex > 0)
-    delete _cache[ck(currentPeriodIndex-1, currentEmployee)];
-
-  await loadEmpPeriod(currentPeriodIndex, currentEmployee);
-  if (currentPeriodIndex > 0)
-    await loadEmpPeriod(currentPeriodIndex-1, currentEmployee);
-
-  // Pour les variantes 2e soir
-  const base = currentEmployee.replace(' 2e soir','').trim();
-  if (base !== currentEmployee) {
-    delete _cache[ck(currentPeriodIndex, base)];
-    await loadEmpPeriod(currentPeriodIndex, base);
-  }
-  hideLoadingOverlay();
-
-  renderDays();
-  document.getElementById('actionsBar').style.display = 'flex';
-  checkScheduled();
-}
-
-function showLoadingOverlay(msg) {
-  document.getElementById('loadingMsg').textContent = msg;
-  document.getElementById('loadingOverlay').classList.remove('hidden');
-}
-function hideLoadingOverlay() {
-  document.getElementById('loadingOverlay').classList.add('hidden');
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  PERIOD
-// ═══════════════════════════════════════════════════════════════
-const DAYS_FR = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi'];
-
-function getAnchor() {
-  const d = new Date((settings.anchorDate||'2026-05-04')+'T00:00:00');
-  return isNaN(d) ? new Date('2026-05-04T00:00:00') : d;
-}
-
-function getPeriod(idx) {
-  const anchor = getAnchor(), ms14 = 14*86400000;
-  const start = new Date(anchor.getTime() + idx*ms14);
-  const days = [];
-  for(let w=0;w<2;w++) for(let d=0;d<5;d++)
-    days.push(new Date(start.getTime()+(w*7+d)*86400000));
-  const sendDate = new Date(days[9].getTime()+3*86400000);
-  sendDate.setHours(15,0,0,0);
-  while(sendDate.getDay()!==1) sendDate.setDate(sendDate.getDate()+1);
-  return {start, end:days[9], days, sendDate, index:idx};
-}
-
-function currentPeriodIdxForNow() {
-  const anchor=getAnchor(), ms14=14*86400000;
-  return Math.max(0, Math.floor((Date.now()-anchor.getTime())/ms14));
-}
-
-function isLocked(idx) { return Date.now() >= getPeriod(idx).sendDate.getTime(); }
-function fmtDate(d,short=false) { return d.toLocaleDateString('fr-CA', short?{day:'2-digit',month:'short'}:{day:'2-digit',month:'short',year:'numeric'}); }
-function fmtTime(d) { return d.toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'}); }
-function fmtH(h) { const hrs=Math.floor(h),m=Math.round((h-hrs)*60); return `${hrs}h${String(m).padStart(2,'0')}`; }
-
-async function changePeriod(delta) {
-  currentPeriodIndex = Math.max(0, currentPeriodIndex+delta);
-  showLoadingOverlay('Chargement de la période…');
-  await loadEmpPeriod(currentPeriodIndex, currentEmployee);
-  if (currentPeriodIndex>0) await loadEmpPeriod(currentPeriodIndex-1, currentEmployee);
-  hideLoadingOverlay();
-  updatePeriodUI(); renderDays();
-}
-
-function updatePeriodUI() {
-  const p=getPeriod(currentPeriodIndex), locked=isLocked(currentPeriodIndex), sent=isSent(currentPeriodIndex), now=new Date();
-  document.getElementById('periodBadge').textContent=`Période ${currentPeriodIndex+1}`;
-  document.getElementById('periodRange').textContent=`${fmtDate(p.start,true)} – ${fmtDate(p.end)}`;
-  const sb=document.getElementById('periodStatusBadge');
-  if(sent){sb.className='badge badge-sent';sb.textContent='✓ Envoyé';sb.style.display='';}
-  else if(locked){sb.className='badge badge-lock';sb.textContent='🔒';sb.style.display='';}
-  else sb.style.display='none';
-  const due=document.getElementById('dueLbl'), ms=p.sendDate-now;
-  if(ms>0){const d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000);
-    due.className=ms<2*86400000?'due-lbl due-urgent':'due-lbl';
-    due.textContent=d>0?`Envoi dans ${d}j ${h}h`:`⚠ Envoi dans ${h}h`;}
-  else due.textContent='';
-}
-
-function updateNextSendLabel() {
-  let idx=currentPeriodIdxForNow(); while(isSent(idx)) idx++;
-  const p=getPeriod(idx);
-  document.getElementById('nextSendLabel').textContent=`Prochain envoi : ${fmtDate(p.sendDate)} à 15h00`;
-  document.getElementById('schedEmail').textContent=settings.email;
-}
-
-function updateClock() {
-  const now=new Date();
-  document.getElementById('hClock').textContent=now.toLocaleDateString('fr-CA',{weekday:'short',day:'2-digit',month:'short'})+' '+fmtTime(now);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER DAYS
-// ═══════════════════════════════════════════════════════════════
-function renderDays() {
-  if(!currentEmployee) return;
-  
-  const p=getPeriod(currentPeriodIndex), locked=isLocked(currentPeriodIndex)||isSent(currentPeriodIndex);
-  const grid=document.getElementById('daysGrid'); grid.innerHTML='';
-  const lb=document.getElementById('lockedBanner'), si=getSentInfo(currentPeriodIndex);
-  if(locked){ lb.style.display='flex';
-    document.getElementById('lockedMsg').textContent=si?`Envoyé le ${fmtDate(new Date(si.sentAt))} à ${fmtTime(new Date(si.sentAt))}.`:`Date d'envoi passée.`;
-  } else lb.style.display='none';
-  for(let i=0;i<10;i++) grid.appendChild(buildDayCard(i,p.days[i],locked));
-  updateSummary();
-}
-
-function buildDayCard(dayIdx,dateObj,locked) {
-  
-  const dayName=DAYS_FR[dayIdx%5], w=dayIdx<5?1:2;
-  const today=new Date(); today.setHours(0,0,0,0);
-  const isToday=dateObj.getTime()===today.getTime();
-  const total=getDayTotal(dayIdx);
-  const card=document.createElement('div');
-  card.className='day-card'+(locked?' locked':''); card.id=`dc_${dayIdx}`;
-  card.innerHTML=`
-    <div class="day-hdr" onclick="toggleDay(${dayIdx})">
-      <div class="day-info">
-        <span class="day-name">${dayName}${isToday?' <span style="font-size:10px;color:var(--ok)">●</span>':''}</span>
-        <span class="day-meta">Sem ${w} · ${dateObj.toLocaleDateString('fr-CA',{day:'2-digit',month:'long'})}</span>
-      </div>
-      <div class="day-right">
-        <span class="day-total${total>0?' active':''}" id="dtb_${dayIdx}">${total>0?fmtH(total):'—'}</span>
-        <span class="day-chev" id="dch_${dayIdx}">▾</span>
-      </div>
-    </div>
-    <div class="day-body" id="db_${dayIdx}">
-      <div class="segs" id="segs_${dayIdx}"></div>
-      ${locked?'':
-        `<button class="add-seg-btn" onclick="addSeg(${dayIdx})">+ Ajouter une entrée / sortie</button>`}
-      <div class="day-sum" id="ds_${dayIdx}"></div>
-    </div>`;
-  setTimeout(()=>{ renderSegs(dayIdx,locked); updateDaySummary(dayIdx); if(isToday) toggleDay(dayIdx,true); },0);
-  return card;
-}
-
-function toggleDay(i,forceOpen) {
-  const b=document.getElementById(`db_${i}`), c=document.getElementById(`dch_${i}`);
-  if(!b)return;
-  if(forceOpen!==undefined){b.classList.toggle('open',forceOpen);c?.classList.toggle('open',forceOpen);return;}
-  b.classList.toggle('open'); c?.classList.toggle('open');
-}
-
-// ── SEGMENTS ──
-function renderSegs(dayIdx,locked) {
-  const con=document.getElementById(`segs_${dayIdx}`); if(!con)return;
-   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
-  if(!segs.length){con.innerHTML='<p style="font-size:12px;color:var(--light);font-style:italic;padding:4px 0">Aucune entrée.</p>';return;}
-  con.innerHTML=''; segs.forEach((seg,si)=>con.appendChild(buildSegEl(dayIdx,si,seg,locked)));
-}
-
-function buildSegEl(dayIdx,si,seg,locked) {
-  const v=validate(seg), div=document.createElement('div');
-  div.className=`seg ${v.valid?'valid':v.error?'error':''}`;
-  div.id=`seg_${dayIdx}_${si}`;
-
-  // Determine effective employee name for this segment
-  const isSeg2eSoir = seg.is2eSoir || false;
-  const base = currentEmployee.replace(' 2e soir','').trim();
-  // Toujours afficher le toggle 2e soir (ne pas dépendre de la liste employees)
-
-  const dk=seg.dentist||'', dobj=dentists.find(d=>d.key===dk);
-  const pillStyle=dobj?`style="background:${dobj.color}"`:'style="background:#9BAABF"';
-  const pillLabel=dobj?dobj.short:'Aucune';
-  const opts=dentists.map(d=>`<option value="${d.key}" ${d.key===dk?'selected':''}>${d.full||d.short}</option>`).join('');
-
-  // 2e soir toggle — toujours visible dans chaque segment
-  const soirHtml = !locked ? `
-    <div class="field">
-      <label>Type de quart</label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;
-        border:1.5px solid ${isSeg2eSoir?'var(--navy)':'var(--border)'};border-radius:8px;
-        background:${isSeg2eSoir?'#EBF2FB':'var(--surface)'};user-select:none"
-        onclick="toggleSeg2eSoir(${dayIdx},${si})">
-        <div style="width:36px;height:20px;border-radius:10px;
-          background:${isSeg2eSoir?'var(--navy)':'#D8E1EF'};
-          position:relative;flex-shrink:0;transition:.2s">
-          <div style="width:16px;height:16px;border-radius:50%;background:#fff;
-            position:absolute;top:2px;left:${isSeg2eSoir?'18':'2'}px;
-            transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
-        </div>
-        <span style="font-size:12px;font-weight:${isSeg2eSoir?'600':'400'};
-          color:${isSeg2eSoir?'var(--navy)':'var(--muted)'}">
-          ${isSeg2eSoir?'2e soir':'Quart normal'}
-        </span>
-      </label>
-    </div>` : (isSeg2eSoir && locked ? `
-    <div class="field">
-      <label>Type de quart</label>
-      <div style="padding:8px 10px;font-size:12px;color:var(--navy);font-weight:600">2e soir</div>
-    </div>` : '');
-
-  div.innerHTML=`
-    <div class="seg-hdr">
-      <span class="seg-num">Segment ${si+1}${isSeg2eSoir?' <span style="font-size:10px;background:#EBF2FB;color:var(--navy);padding:1px 6px;border-radius:10px;font-weight:600">2e soir</span>':''}</span>
-      <span class="dent-pill" ${pillStyle}>${pillLabel}</span>
-    </div>
-    <div class="seg-fields" style="grid-template-columns:1fr 1fr 80px 1fr 1fr auto">
-      <div class="field"><label>Entrée</label>
-        <input type="time" value="${seg.entree||''}" ${locked?'disabled':''}
-          oninput="updSeg(${dayIdx},${si},'entree',this.value)"
-          onblur="revalSeg(${dayIdx},${si})"
-          class="${v.valid&&seg.entree?'ok':v.error&&!seg.entree?'bad':''}"></div>
-      <div class="field"><label>Sortie</label>
-        <input type="time" value="${seg.sortie||''}" ${locked?'disabled':''}
-          oninput="updSeg(${dayIdx},${si},'sortie',this.value)"
-          onblur="revalSeg(${dayIdx},${si})"
-          class="${v.valid&&seg.sortie?'ok':v.error&&!seg.sortie?'bad':''}"></div>
-      <div class="field"><label>Pause (min)</label>
-        <input type="number" min="0" max="180" step="5" value="${seg.pause||''}" placeholder="0"
-          ${locked?'disabled':''}
-          oninput="updSeg(${dayIdx},${si},'pause',this.value)"></div>
-      ${soirHtml}
-      <div class="field f-dent"><label>Dentiste</label>
-        <select ${locked?'disabled':''} onchange="updSeg(${dayIdx},${si},'dentist',this.value)">
-          <option value="">— Sélectionner —</option>${opts}</select></div>
-      ${locked?'':
-        `<button class="del-btn" onclick="delSeg(${dayIdx},${si})">✕</button>`}
-    </div>
-    <div class="seg-msg ${v.valid?'ok':v.error?'bad':''}">${v.msg||''}</div>`;
-  return div;
-}
-
-function toggleSeg2eSoir(dayIdx, si) {
-  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
-  if (!segs[si]) return;
-  segs[si].is2eSoir = !segs[si].is2eSoir;
-  setEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx, segs);
-  // Re-render just this segment
-  const el = document.getElementById(`seg_${dayIdx}_${si}`);
-  const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
-  if (el) el.replaceWith(buildSegEl(dayIdx, si, segs[si], locked));
-  updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-}
-
-function getSegEmpName(seg) {
-  // Returns the effective employee name for a segment (base or 2e soir)
-  const base = currentEmployee.replace(' 2e soir','').trim();
-  return seg.is2eSoir ? `${base} 2e soir` : base;
-}
-
-function addSeg(dayIdx) {
-  const segs = [...getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx),
-                {entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false}];
-  setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
-  renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-  if(!document.getElementById(`db_${dayIdx}`)?.classList.contains('open')) toggleDay(dayIdx);
-}
-
-function delSeg(dayIdx,si) {
-   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
-  segs.splice(si,1); setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
-  renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-}
-
-function updSeg(dayIdx,si,field,value) {
-  const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
-  if(!segs[si])return; segs[si][field]=value;
-  setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
-  updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-  if(field==='dentist'||field==='entree'||field==='sortie') revalDay(dayIdx);
-}
-
-function revalSeg(dayIdx,si) {
-   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
-  if(!segs[si])return;
-  const seg=segs[si], el=document.getElementById(`seg_${dayIdx}_${si}`); if(!el)return;
-  const v=validate(seg);
-  el.className=`seg ${v.valid?'valid':v.error?'error':''}`;
-  el.querySelector('.seg-msg').className=`seg-msg ${v.valid?'ok':v.error?'bad':''}`;
-  el.querySelector('.seg-msg').textContent=v.msg||'';
-  const pill=el.querySelector('.dent-pill'), dk=seg.dentist||'', dobj=dentists.find(d=>d.key===dk);
-  pill.style.background=dobj?dobj.color:'#9BAABF'; pill.textContent=dobj?dobj.short:'Aucune';
-}
-
-// ── VALIDATION ──
-function toMin(t){if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;}
-function validate(seg){
-  if(!seg.entree&&!seg.sortie&&!seg.dentist)return{valid:false,error:false,msg:'',hrs:0};
-  if(!seg.entree)return{valid:false,error:true,msg:"⚠ Heure d'entrée manquante.",hrs:0};
-  if(!seg.sortie)return{valid:false,error:true,msg:"⚠ Heure de sortie manquante.",hrs:0};
-  if(!seg.dentist)return{valid:false,error:true,msg:"⚠ Dentiste non sélectionné.",hrs:0};
-  const em=toMin(seg.entree),sm=toMin(seg.sortie);
-  if(sm<=em)return{valid:false,error:true,msg:"⚠ Sortie doit être après l'entrée.",hrs:0};
-  const pause=parseInt(seg.pause)||0, totalMin=sm-em-pause;
-  if(totalMin<=0)return{valid:false,error:true,msg:"⚠ La pause dépasse la durée de travail.",hrs:0};
-  const hrs=totalMin/60, dn=dentists.find(d=>d.key===seg.dentist)?.short||seg.dentist;
-  return{valid:true,error:false,msg:`✓ ${seg.entree} → ${seg.sortie}${pause?` (pause ${pause}min)`:''} = ${fmtH(hrs)} avec ${dn}`,hrs,em,sm};
-}
-
-function checkOverlaps(dayIdx) {
-  return checkOverlapsForEmp(currentEmployee, dayIdx);
-}
-
-function checkOverlapsForEmp(empName, dayIdx) {
-  // Détecte les chevauchements d'horaires entre segments d'une même journée
-  const segs = getEmpDaySegs(currentPeriodIndex, empName, dayIdx);
-  const errors = [];
-  for (let i = 0; i < segs.length; i++) {
-    const vi = validate(segs[i]);
-    if (!vi.valid) continue;
-    for (let j = i+1; j < segs.length; j++) {
-      const vj = validate(segs[j]);
-      if (!vj.valid) continue;
-      if (vi.em < vj.sm && vj.em < vi.sm) {
-        errors.push({
-          si: i, sj: j,
-          msg: `⚠ Conflit : Segment ${i+1} (${segs[i].entree}–${segs[i].sortie}) chevauche Segment ${j+1} (${segs[j].entree}–${segs[j].sortie})`
-        });
-      }
+    // Fallback to localStorage
+    try {
+      const r = localStorage.getItem(STORE_KEY);
+      if (r) return JSON.parse(r);
+    } catch(e) {}
+    return null;
+  },
+  async set(data) {
+    const str = JSON.stringify(data);
+    // Try window.storage first
+    if (typeof window !== "undefined" && window.storage) {
+      try { await window.storage.set(STORE_KEY, str); } catch(e) {}
     }
+    // Also write to localStorage as backup
+    try { localStorage.setItem(STORE_KEY, str); } catch(e) {}
   }
-  return errors;
-}
-
-function revalDay(dayIdx) {
-  // Re-validate all segments in a day and show overlap errors
-  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
-  const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
-  const overlaps = checkOverlaps(dayIdx);
-  const overlapSis = new Set(overlaps.flatMap(e => [e.si, e.sj]));
-
-  segs.forEach((seg, si) => {
-    const el = document.getElementById(`seg_${dayIdx}_${si}`);
-    if (!el) return;
-    const v = validate(seg);
-    const hasOverlap = overlapSis.has(si);
-
-    // Class: overlap takes priority over valid/error
-    el.className = `seg ${hasOverlap ? 'error' : v.valid ? 'valid' : v.error ? 'error' : ''}`;
-    const msgEl = el.querySelector('.seg-msg');
-    if (hasOverlap) {
-      const ovErr = overlaps.find(e => e.si===si || e.sj===si);
-      msgEl.className = 'seg-msg bad';
-      msgEl.textContent = ovErr ? ovErr.msg : '⚠ Chevauchement d\'horaire détecté.';
-    } else {
-      msgEl.className = `seg-msg ${v.valid?'ok':v.error?'bad':''}`;
-      msgEl.textContent = v.msg || '';
-    }
-
-    // Update dentist pill
-    const pill = el.querySelector('.dent-pill');
-    if (pill) {
-      const dk = seg.dentist||'', dobj = dentists.find(d=>d.key===dk);
-      pill.style.background = dobj ? dobj.color : '#9BAABF';
-      pill.textContent = dobj ? dobj.short : 'Aucune';
-    }
-  });
-
-  // Show day-level overlap summary if any
-  const sumEl = document.getElementById(`ds_${dayIdx}`);
-  if (sumEl && overlaps.length > 0) {
-    const overlapHtml = overlaps.map(e =>
-      `<div style="color:var(--err);font-size:11px;font-weight:600;padding:2px 0">${e.msg}</div>`
-    ).join('');
-    sumEl.innerHTML = `<div class="ds-title" style="color:var(--err)">⚠ Conflits d'horaire</div>${overlapHtml}`;
-  }
-}
-
-function revalSeg(dayIdx, si) {
-  const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
-  if (!segs[si]) return;
-  // Revalider toute la journée pour détecter les chevauchements
-  revalDay(dayIdx);
-  updateDaySummary(dayIdx);
-}
-function getDayTotal(di){return getEmpDaySegs(currentPeriodIndex,currentEmployee,di).reduce((s,seg)=>s+(validate(seg).hrs||0),0);}
-function getDayByDentist(di){const r={};getEmpDaySegs(currentPeriodIndex,currentEmployee,di).forEach(seg=>{const v=validate(seg);if(v.valid&&seg.dentist)r[seg.dentist]=(r[seg.dentist]||0)+v.hrs;});return r;}
-
-// ── UI updates ──
-function updateDayBadge(di){const b=document.getElementById(`dtb_${di}`);if(!b)return;const t=getDayTotal(di);b.textContent=t>0?fmtH(t):'—';b.className=t>0?'day-total active':'day-total';}
-function updateDaySummary(di){
-  const el=document.getElementById(`ds_${di}`);if(!el)return;
-  const byD=getDayByDentist(di),tot=getDayTotal(di);
-  if(!tot){el.innerHTML='<div class="ds-title">Résumé</div><div class="ds-none">Aucune heure.</div>';return;}
-  const items=dentists.filter(d=>byD[d.key]>0).map(d=>`<span class="ds-pill" style="background:${d.light||'#eee'};color:${d.color}">${d.short} ${fmtH(byD[d.key])}</span>`).join('');
-  el.innerHTML=`<div class="ds-title">Total : ${fmtH(tot)}</div><div class="ds-pills">${items}</div>`;
-}
-
-function updateSummary(){
-  if(!currentEmployee)return;
-  const p=getPeriod(currentPeriodIndex);
-  const totals={}; dentists.forEach(d=>totals[d.key]=0); let grand=0;
-  const thead=document.getElementById('sumThead');
-  thead.innerHTML=`<th>Journée</th>${dentists.map(d=>`<th>${d.short}</th>`).join('')}<th>Total</th>`;
-  const tbody=document.getElementById('sumBody'); tbody.innerHTML='';
-  for(let i=0;i<10;i++){
-    const byD=getDayByDentist(i),dt=getDayTotal(i);grand+=dt;
-    dentists.forEach(d=>totals[d.key]+=(byD[d.key]||0));
-    const w=i<5?1:2;
-    const tr=document.createElement('tr');
-    const cells=[`<td><strong>${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`];
-    dentists.forEach(d=>{const h=byD[d.key]||0;cells.push(`<td class="${h>0?'cell-v':'cell-n'}">${h>0?fmtH(h):'—'}</td>`);});
-    cells.push(`<td><strong>${dt>0?fmtH(dt):'—'}</strong></td>`);
-    tr.innerHTML=cells.join(''); tbody.appendChild(tr);
-  }
-  const tfoot=document.getElementById('sumTfoot');
-  tfoot.innerHTML=`<td>TOTAL</td>${dentists.map(d=>`<td>${totals[d.key]>0?fmtH(totals[d.key]):'—'}</td>`).join('')}<td>${grand>0?fmtH(grand):'—'}</td>`;
-  document.getElementById('weekSummary').style.display=grand>0?'block':'none';
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  APERÇU
-// ═══════════════════════════════════════════════════════════════
-async function showApercu() {
-  if(!currentEmployee) return;
-  const p = getPeriod(currentPeriodIndex);
-
-  // Charger période précédente si besoin (pour comparaison)
-  showLoadingOverlay('Préparation de l\'aperçu…');
-  if(currentPeriodIndex > 0) {
-    // Charger depuis localStorage d'abord pour la période précédente
-    employees.forEach(emp => {
-      const k = ck(currentPeriodIndex-1, emp.name);
-      if (!_cache[k]) {
-        try {
-          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-          if (local) _cache[k] = local;
-        } catch(e) {}
-      }
-    });
-  }
-  hideLoadingOverlay();
-
-  // Section 1 — Erreurs (validation + chevauchements)
-  const errors=[];
-  for(let i=0;i<10;i++) {
-    getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach((seg,si)=>{
-      const v=validate(seg); if(v.error) errors.push(`${DAYS_FR[i%5]} Sem${i<5?1:2}, seg ${si+1} : ${v.msg}`);
-    });
-    const overlaps = checkOverlaps(i);
-    const p2 = getPeriod(currentPeriodIndex);
-    overlaps.forEach(e => errors.push(
-      `${DAYS_FR[i%5]} Sem${i<5?1:2} (${p2.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}) : ${e.msg}`
-    ));
-  }
-  const errDiv=document.getElementById('apercuErrors'), errOk=document.getElementById('apercuOk');
-  if(errors.length){errDiv.style.display='block';errOk.style.display='none';
-    document.getElementById('apercuErrorList').innerHTML=errors.map(e=>`<div>• ${e}</div>`).join('');}
-  else{errDiv.style.display='none';errOk.style.display='block';}
-
-  // Section 2 — Tableau
-  document.getElementById('apercuPeriodLabel').textContent=`${fmtDate(p.start,true)} au ${fmtDate(p.end)}`;
-  const activeDents=dentists.filter(d=>{let t=0;for(let i=0;i<10;i++)getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{const v=validate(s);if(v.valid&&s.dentist===d.key)t+=v.hrs;});return t>0;});
-  const curTotals={};let curGrand=0;
-  const thead=document.getElementById('apercuThead');
-  thead.innerHTML=`<th style="text-align:left">Journée</th>${activeDents.map(d=>`<th>${d.short}</th>`).join('')}<th>Total</th>`;
-  const tbody=document.getElementById('apercuTbody'); tbody.innerHTML='';
-  for(let i=0;i<10;i++){
-    const byD=getDayByDentist(i),dt=getDayTotal(i); curGrand+=dt;
-    activeDents.forEach(d=>curTotals[d.key]=(curTotals[d.key]||0)+(byD[d.key]||0));
-    const w=i<5?1:2;
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="text-align:left"><strong>${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`+
-      activeDents.map(d=>{const h=byD[d.key]||0;return`<td style="color:${h>0?'var(--text)':'var(--light)'}">${h>0?fmtH(h):'—'}</td>`;}).join('')+
-      `<td><strong>${dt>0?fmtH(dt):'—'}</strong></td>`;
-    tbody.appendChild(tr);
-  }
-  const tfoot=document.getElementById('apercuTfoot');
-  tfoot.innerHTML=`<td style="text-align:left">TOTAL</td>${activeDents.map(d=>`<td>${curTotals[d.key]>0?fmtH(curTotals[d.key]):'—'}</td>`).join('')}<td>${curGrand>0?fmtH(curGrand):'—'}</td>`;
-
-  // Section 3 — Comparaison par employée
-  const compareDiv=document.getElementById('apercuCompare');
-  const cs=document.getElementById('apercuCompareSection');
-  if(currentPeriodIndex===0){cs.style.display='none';}
-  else{
-    cs.style.display='block';
-    const empCur={},empPrev={};
-    employees.forEach(emp=>{
-      let c=0; for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)c+=v.hrs;});
-      if(c>0) empCur[emp.name]=c;
-      let p2=0; for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex-1,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)p2+=v.hrs;});
-      if(p2>0) empPrev[emp.name]=p2;
-    });
-    const allEmps=[...new Set([...Object.keys(empCur),...Object.keys(empPrev)])];
-    if(!allEmps.length){compareDiv.innerHTML='<div style="color:var(--muted);font-style:italic">Aucune donnée pour la période précédente.</div>';}
-    else{
-      let rows=[],hasDiff=false,grandC=0,grandP=0;
-      allEmps.forEach(name=>{
-        const cur=empCur[name]||0,prev=empPrev[name]||0; grandC+=cur; grandP+=prev;
-        const diff=cur-prev,abs=Math.abs(diff),isSig=abs>10; if(isSig)hasDiff=true;
-        const pct=prev>0?Math.round(diff/prev*100):(cur>0?100:0);
-        const diffColor=diff>10?'#16A34A':diff<-10?'#DC2626':'#6B7A99';
-        const icon=diff>10?'↑':diff<-10?'↓':'≈';
-        const diffTxt=abs>0?`${diff>0?'+':''}${fmtH(abs)}${prev>0?` (${diff>0?'+':''}${pct}%)`:''}`:'=';
-        const bg=isSig?(diff>0?'#DCFCE7':'#FEE2E2'):'var(--surf2)';
-        const bd=isSig?(diff>0?'#BBF7D0':'#FECACA'):'var(--border)';
-        rows.push(`<div class="cmp-row ${isSig?(diff>0?'up':'down'):''}">
-          <span class="cmp-name">${name.replace(' 2e soir',' ✦')}</span>
-          <span class="cmp-vals">${prev>0?fmtH(prev):'—'} → ${cur>0?fmtH(cur):'—'}</span>
-          <span class="cmp-diff ${diff>10?'diff-up':diff<-10?'diff-down':'diff-neut'}">${icon} ${diffTxt}</span>
-        </div>`);
-      });
-      const td=grandC-grandP,tp=grandP>0?Math.round(td/grandP*100):0;
-      const html=(hasDiff
-        ?`<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:9px 13px;margin-bottom:10px;font-size:12px;color:#92400E">⚠ Des différences de plus de 10h ont été détectées. Veuillez vérifier avant d'envoyer.</div>`
-        :`<div style="background:var(--ok-l);border:1px solid var(--ok);border-radius:8px;padding:9px 13px;margin-bottom:10px;font-size:12px;color:var(--ok)">✓ Les heures sont cohérentes (variations &lt;10h).</div>`
-      )+rows.join('')+
-      `<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--navy2);border-radius:8px;margin-top:8px;color:#fff">
-        <span style="font-weight:700;font-size:12px;min-width:130px">TOTAL TOUTES</span>
-        <span style="font-size:11px;font-family:'DM Mono',monospace;flex:1;opacity:.75">${fmtH(grandP)} → ${fmtH(grandC)}</span>
-        <span style="font-weight:700;font-size:13px;color:${Math.abs(td)>10?(td>0?'#86EFAC':'#FCA5A5'):'rgba(255,255,255,.8)'}">
-          ${td>0?'+':''}${fmtH(td)} (${td>0?'+':''}${tp}%)</span>
-      </div>`;
-      compareDiv.innerHTML=html;
-    }
-  }
-
-  const sendBtn=document.getElementById('apercuSendBtn');
-  const hasErrors = errors.length > 0;
-  sendBtn.style.opacity = hasErrors ? '0.45' : '1';
-  sendBtn.style.cursor  = hasErrors ? 'not-allowed' : 'pointer';
-  sendBtn.disabled      = hasErrors;
-  sendBtn.title         = hasErrors ? 'Corrigez les erreurs et conflits avant d\'envoyer.' : '';
-  sendBtn.style.display = isAdmin ? '' : 'none';
-  sendBtn.onclick       = hasErrors ? null : ()=>{ closeApercu(); showSendModal(); };
-  document.getElementById('apercuModal').classList.add('open');
-}
-
-function closeApercu(){document.getElementById('apercuModal').classList.remove('open');}
-
-// ═══════════════════════════════════════════════════════════════
-//  SEND
-// ═══════════════════════════════════════════════════════════════
-function showSendModal(){
-  if(!isAdmin){toast('Seul l\'administrateur peut envoyer.','warn');return;}
-
-  // Vérifier conflits pour toutes les employées avant d'autoriser l'envoi
-  const conflictMessages = [];
-  employees.forEach(emp => {
-    for(let i=0;i<10;i++){
-      const overlaps = checkOverlapsForEmp(emp.name, i);
-      overlaps.forEach(e => {
-        const p = getPeriod(currentPeriodIndex);
-        const w = i<5?1:2;
-        conflictMessages.push(`• ${emp.name} — ${DAYS_FR[i%5]} Sem${w} (${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}) : Seg ${e.si+1} et Seg ${e.sj+1} se chevauchent`);
-      });
-    }
-  });
-
-  if(conflictMessages.length > 0){
-    // Afficher modal de blocage avec détails
-    showConflictBlock(conflictMessages);
-    return;
-  }
-
-  const p=getPeriod(currentPeriodIndex); let count=0;
-  for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{if(validate(s).valid)count++;});
-  document.getElementById('mEmail').textContent=settings.email;
-  document.getElementById('mPeriod').textContent=`${fmtDate(p.start)} au ${fmtDate(p.end)}`;
-  document.getElementById('mCount').textContent=count;
-  document.getElementById('sendModal').classList.add('open');
-}
-function showConflictBlock(messages) {
-  const modal = document.getElementById('conflictModal');
-  const list  = document.getElementById('conflictList');
-  list.innerHTML = messages.map(m =>
-    `<div style="padding:6px 0;border-bottom:1px solid #FECACA;font-size:12px;color:#7F1D1D">${m}</div>`
-  ).join('');
-  modal.classList.add('open');
-}
-
-function closeConflictModal() {
-  document.getElementById('conflictModal').classList.remove('open');
-}
-
-function closeModal(){document.getElementById('sendModal').classList.remove('open');}
-
-// Colonnes Excel
-const DENT_COLS={
-  MMM:{s1:3,s2:4,tot:5},CG:{s1:6,s2:7,tot:8},MC:{s1:9,s2:10,tot:11},
-  Aym:{s1:12,s2:13,tot:14},Kelly:{s1:15,s2:16,tot:17},
-  ADMIN:{s1:18,s2:19,tot_semaine:20,tot_heures:18},
-  FORMATION:{s1:21,s2:22,tot_semaine:23,tot_heures:19},
 };
-const SEMAINE_ROWS={'Anne G.':6,'Anne G. 2e soir':7,'Annick':8,'Annick 2e soir':9,'Céline':10,'Céline 2e soir':11,'Josée':12,'Josée 2e soir':13,'Marie Claude':14,'Marie Claude 2e soir':15,'Nancy P.':16,'Nancy P. 2e soir':17,'Philippe Girard':18,'Philippe Girard 2e soir':19,'Audrey Demers':21,'Audrey Demers 2e soir':22,'Élizabeth':23,'Élizabeth 2e soir':24,'Éléonore':25,'Éléonore 2e soir':26,'Isabelle':27,'Isabelle 2e soir':28,'Mélissa':29,'Mélissa 2e soir':30,'Nancy Guillemette':31,'Nancy Guillemette 2e soir':32,'Chantal':34,'Chantal 2e soir':35,'Jessica':36,'Jessica 2e soir':37,'Lison':38,'Lison 2e soir':39,'Manon':40,'Manon 2e soir':41,'Marie-Ève M.':42,'Marie-Ève M. 2e soir':43,'Marilyn':44,'Marilyn 2e soir':45,'Mélanie':46,'Mélanie 2e soir':47,'Myriam':48,'Myriam 2e soir':49,'Nancy V.':50,'Nancy V. 2e soir':51,'Sabrina':52,'Sabrina 2e soir':53};
-const HEURES_ROWS={...SEMAINE_ROWS};
 
-function getEmpHoursPerDentistPerWeek(empName, pi) {
-  // Returns { dentistKey: { sem1: h, sem2: h } } for a given employee name
-  // For segments with is2eSoir, only count if empName matches the 2e soir variant
-  const base = empName.replace(' 2e soir','').trim();
-  const is2eSoirEmp = empName.includes('2e soir');
-  const result = {};
-  for (let i=0; i<10; i++) {
-    const sem = i<5?'sem1':'sem2';
-    // Load from base employee's storage (all segments stored under base name)
-    getEmpDaySegs(pi, base, i).forEach(seg => {
-      const segIs2e = seg.is2eSoir || false;
-      // Only count segment if it matches the requested employee type
-      if (segIs2e !== is2eSoirEmp) return;
-      const v = validate(seg); if (!v.hrs || !seg.dentist) return;
-      if (!result[seg.dentist]) result[seg.dentist] = {sem1:0,sem2:0};
-      result[seg.dentist][sem] += v.hrs;
-    });
-  }
-  return result;
-}
-
-function buildXlsxData(pi){
-  const sheets={Semaine:{},Heures:{}};
-  employees.forEach(emp=>{
-    const byD=getEmpHoursPerDentistPerWeek(emp.name,pi);
-    const tot=Object.values(byD).reduce((s,d)=>s+d.sem1+d.sem2,0); if(!tot)return;
-    const s2r=SEMAINE_ROWS[emp.name]; const s3r=HEURES_ROWS[emp.name];
-    if(s2r){sheets.Semaine[s2r]=sheets.Semaine[s2r]||{};
-      Object.entries(byD).forEach(([dk,hrs])=>{const cols=DENT_COLS[dk];if(!cols)return;const t=hrs.sem1+hrs.sem2;
-        if(dk==='ADMIN'){sheets.Semaine[s2r][18]=(sheets.Semaine[s2r][18]||0)+hrs.sem1;sheets.Semaine[s2r][19]=(sheets.Semaine[s2r][19]||0)+hrs.sem2;sheets.Semaine[s2r][20]=(sheets.Semaine[s2r][20]||0)+t;}
-        else if(dk==='FORMATION'){sheets.Semaine[s2r][21]=(sheets.Semaine[s2r][21]||0)+hrs.sem1;sheets.Semaine[s2r][22]=(sheets.Semaine[s2r][22]||0)+hrs.sem2;sheets.Semaine[s2r][23]=(sheets.Semaine[s2r][23]||0)+t;}
-        else if(cols.s1&&cols.tot){sheets.Semaine[s2r][cols.s1]=(sheets.Semaine[s2r][cols.s1]||0)+hrs.sem1;sheets.Semaine[s2r][cols.s2]=(sheets.Semaine[s2r][cols.s2]||0)+hrs.sem2;sheets.Semaine[s2r][cols.tot]=(sheets.Semaine[s2r][cols.tot]||0)+t;}
-      });
-    }
-    if(s3r){sheets.Heures[s3r]=sheets.Heures[s3r]||{};
-      Object.entries(byD).forEach(([dk,hrs])=>{const cols=DENT_COLS[dk];if(!cols)return;const t=hrs.sem1+hrs.sem2;
-        if(dk==='ADMIN'){sheets.Heures[s3r][18]=(sheets.Heures[s3r][18]||0)+t;}
-        else if(dk==='FORMATION'){sheets.Heures[s3r][19]=(sheets.Heures[s3r][19]||0)+t;}
-        else if(cols.s1&&cols.tot){sheets.Heures[s3r][cols.s1]=(sheets.Heures[s3r][cols.s1]||0)+hrs.sem1;sheets.Heures[s3r][cols.s2]=(sheets.Heures[s3r][cols.s2]||0)+hrs.sem2;sheets.Heures[s3r][cols.tot]=(sheets.Heures[s3r][cols.tot]||0)+t;}
-      });
-    }
-  });
-  return sheets;
-}
-
-function round2(v){return v?Math.round(v*100)/100:0;}
-
-function generateXlsx(pi){
-  if(typeof XLSX==='undefined')throw new Error('SheetJS non chargé');
-  const p=getPeriod(pi),data=buildXlsxData(pi);
-  const DKEYS=['MMM','CG','MC','Aym','Kelly'];
-  const DFULL={MMM:'Dre Marie-Michèle Moreau',CG:'Dre Catherine Gagnon',MC:'Dre Marie Côté',Aym:'Dr Aymeric Bherer',Kelly:'Dre Kelly-Ann Grondin'};
-  const s2h=[['Employée','Catégorie']]; DKEYS.forEach(dk=>{s2h[0].push(DFULL[dk],'','');});
-  s2h[0].push('Administration','','','Formation','','','Total ligne');
-  const s2h2=['','']; DKEYS.forEach(()=>s2h2.push('Sem 1','Sem 2','Total')); s2h2.push('Sem 1','Sem 2','Total','Sem 1','Sem 2','Total','Total');
-  const s2=[s2h[0],s2h2];
-  employees.forEach(emp=>{
-    const sr=SEMAINE_ROWS[emp.name]; if(!sr)return;
-    const d=data.Semaine[sr]||{},row=[emp.name,emp.cat];
-    DKEYS.forEach(dk=>{const cols=DENT_COLS[dk];row.push(round2(d[cols.s1]||0),round2(d[cols.s2]||0),round2(d[cols.tot]||0));});
-    row.push(round2(d[18]||0),round2(d[19]||0),round2(d[20]||0));
-    row.push(round2(d[21]||0),round2(d[22]||0),round2(d[23]||0));
-    const lt=DKEYS.reduce((s,dk)=>{const c=DENT_COLS[dk];return s+(d[c.tot]||0);},0)+(d[20]||0)+(d[23]||0);
-    row.push(round2(lt)); s2.push(row);
-  });
-  const s3h=[s2h[0]],s3h2=[s2h2[0]+''];
-  const s3=[s2h[0].slice(0,-1).concat(['Admin Total','Form Total','Total général']),s2h2];
-  employees.forEach(emp=>{
-    const sr=HEURES_ROWS[emp.name]; if(!sr)return;
-    const d=data.Heures[sr]||{},row=[emp.name,emp.cat];
-    DKEYS.forEach(dk=>{const cols=DENT_COLS[dk];row.push(round2(d[cols.s1]||0),round2(d[cols.s2]||0),round2(d[cols.tot]||0));});
-    const gt=DKEYS.reduce((s,dk)=>{const c=DENT_COLS[dk];return s+(d[c.tot]||0);},0)+(d[18]||0)+(d[19]||0);
-    row.push(round2(d[18]||0),round2(d[19]||0),round2(gt)); s3.push(row);
-  });
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s2),'Semaine du 6 au 17 avril');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s3),'Heures et proportions');
-  return XLSX.write(wb,{bookType:'xlsx',type:'array'});
-}
-
-async function doSend(){
-  closeModal();
-  const p=getPeriod(currentPeriodIndex);
-  const pStr=`${fmtDate(p.start)} au ${fmtDate(p.end)}`;
-  const filename=`Répartition_StEtienne_P${currentPeriodIndex+1}_${p.start.toISOString().slice(0,10)}.xlsx`;
-  showLoadingOverlay('Génération du fichier Excel…');
-  // Charger toutes les données de la période
-  await loadAllPeriod(currentPeriodIndex);
-  hideLoadingOverlay();
-  try{
-    const xlsxData=generateXlsx(currentPeriodIndex);
-    const blob=new Blob([xlsxData],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href);
-    const subj=encodeURIComponent(`Paie Clinique St-Étienne — Période ${currentPeriodIndex+1} (${pStr})`);
-    const body=encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint la feuille de répartition pour la période du ${pStr}.\n\nFichier : ${filename}\n\nCordialement,\nClinique St-Étienne`);
-    setTimeout(()=>window.open(`mailto:${settings.email}?subject=${subj}&body=${body}`,'_blank'),600);
-    await markSent(currentPeriodIndex);
-    toast(`✓ Fichier Excel généré · Courriel préparé pour ${settings.email}`,'ok');
-    updatePeriodUI(); renderDays(); updateNextSendLabel();
-  }catch(e){console.error(e);toast('Erreur lors de la génération du fichier.','err');}
-}
-
-function clearPeriod(){
-  if(!confirm('Effacer toutes vos entrées pour cette période?'))return;
-  delete _cache[ck(currentPeriodIndex,currentEmployee)];
-  localStorage.removeItem(`paie_${ck(currentPeriodIndex,currentEmployee)}`);
-  syncDay(currentPeriodIndex,currentEmployee,0,[]);
-  renderDays(); toast('Entrées effacées.','info');
-}
-
-function checkScheduled(){
-  const now=new Date();
-  for(let idx=0;idx<=currentPeriodIdxForNow();idx++){
-    const p=getPeriod(idx);
-    if(!isSent(idx)&&now>=p.sendDate){
-      const ak=`alert_p${idx}`;
-      if(!sessionStorage.getItem(ak)){sessionStorage.setItem(ak,'1');
-        if(idx===currentPeriodIndex) toast(`⏰ La période ${idx+1} devrait être envoyée.`,'warn');}
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RAPPELS COURRIEL (via Resend)
-// ═══════════════════════════════════════════════════════════════
-async function sendReminderEmail(toEmail, empName, periodStr, lockDate, missingDays) {
-  const subject = `Rappel — Saisie des heures avant demain ${lockDate}`;
-  const html = `
-    <div style="font-family:sans-serif;max-width:500px;margin:0 auto">
-      <div style="background:#1C3557;padding:20px 24px;border-radius:12px 12px 0 0">
-        <h1 style="color:#fff;margin:0;font-size:20px">🦷 Clinique St-Étienne</h1>
-        <p style="color:rgba(255,255,255,.7);margin:4px 0 0;font-size:13px">Feuille de temps — Rappel</p>
-      </div>
-      <div style="background:#F5F7FC;padding:24px;border-radius:0 0 12px 12px;border:1px solid #D8E1EF">
-        <p style="font-size:15px;color:#1A2340">Bonjour <strong>${empName}</strong>,</p>
-        <p style="font-size:14px;color:#1A2340;margin:12px 0">
-          La période de saisie <strong>${periodStr}</strong> se termine <strong>demain à 15h00</strong>.
-        </p>
-        <div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;margin:16px 0">
-          <p style="font-size:13px;color:#92400E;margin:0">
-            ⚠ Il vous manque des heures pour <strong>${missingDays}</strong> journée(s).
-          </p>
-        </div>
-        <a href="https://paie-stetienne.vercel.app" 
-           style="display:inline-block;background:#1C3557;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;margin:8px 0">
-          Accéder à la feuille de temps →
-        </a>
-        <p style="font-size:12px;color:#6B7A99;margin-top:16px">
-          Après 15h00 demain, la période sera verrouillée et vous ne pourrez plus modifier vos heures.
-        </p>
-      </div>
-    </div>`;
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Clinique St-Étienne <paie@cliniquestetienne.com>',
-      to: [toEmail],
-      subject,
-      html
-    })
-  });
-  return res.ok;
-}
-
-async function sendTestReminder() {
-  const log = document.getElementById('reminderLog');
-  log.textContent = 'Envoi en cours…';
-  const p = getPeriod(currentPeriodIndex);
-  const pStr = `${fmtDate(p.start,true)} au ${fmtDate(p.end)}`;
-  const lockDate = fmtDate(p.sendDate);
-  let sent = 0, skipped = 0;
-  for (const emp of employees) {
-    if (!emp.email || emp.name.includes('2e soir')) continue;
-    // Compter journées manquantes
-    let missing = 0;
-    for (let i=0; i<10; i++) {
-      const segs = getEmpDaySegs(currentPeriodIndex, emp.name, i);
-      const hasValid = segs.some(s => validate(s).valid);
-      if (!hasValid) missing++;
-    }
-    if (missing > 0) {
-      const ok = await sendReminderEmail(emp.email, emp.name, pStr, lockDate, missing);
-      if (ok) sent++; else skipped++;
-    } else skipped++;
-  }
-  log.textContent = `✓ Rappels envoyés: ${sent} · Ignorés (0 manquant ou pas de courriel): ${skipped}`;
-  toast(`Rappels envoyés à ${sent} employée(s)`, 'ok');
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  ADMIN PANEL
-// ═══════════════════════════════════════════════════════════════
-function openAdmin(){
-  renderAdminEmployees(); renderAdminDentists();
-  document.getElementById('settingEmail').value=settings.email||'';
-  document.getElementById('settingAnchor').value=settings.anchorDate||'';
-  renderEmailList();
-  document.getElementById('adminOverlay').classList.add('open');
-}
-function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');}
-function closeAdminIfBg(e){if(e.target===document.getElementById('adminOverlay'))closeAdmin();}
-function switchAdminTab(tab){
-  ['employees','dentists','settings','reminders'].forEach(t=>{
-    document.getElementById(`panel-${t}`).style.display=t===tab?'':'none';
-    document.getElementById(`tab-${t}`).className=t===tab?'admin-tab active':'admin-tab';
-  });
-}
-
-function renderAdminEmployees(){
-  const list=document.getElementById('empList'); list.innerHTML='';
-  const catColors={Administration:'#1F4E79',Assistante:'#375623',Hygiéniste:'#D97706'};
-  employees.forEach((emp,idx)=>{
-    const div=document.createElement('div'); div.className='list-item';
-    div.innerHTML=`<span class="list-item-name">${emp.name}</span>
-      <span class="list-item-cat" style="color:${catColors[emp.cat]||'#666'}">${emp.cat}</span>
-      <span class="list-item-email">${emp.email||'—'}</span>
-      <button class="item-del" onclick="deleteEmployee(${idx})">✕</button>`;
-    list.appendChild(div);
-  });
-  if(!employees.length) list.innerHTML='<p style="font-size:12px;color:var(--muted);font-style:italic">Aucune employée.</p>';
-}
-
-function addEmployee(){
-  const name=document.getElementById('newEmpName').value.trim();
-  const cat=document.getElementById('newEmpCat').value;
-  const email=document.getElementById('newEmpEmail').value.trim().toLowerCase();
-  if(!name){toast('Entrez un nom.','err');return;}
-  if(employees.find(e=>e.name===name)){toast('Cette employée existe déjà.','warn');return;}
-  employees.push({name,cat,email});
-  saveConfig(); renderAdminEmployees(); renderEmpSelector();
-  document.getElementById('newEmpName').value='';
-  document.getElementById('newEmpEmail').value='';
-  toast(`${name} ajoutée ✓`,'ok');
-}
-
-function deleteEmployee(idx){
-  const emp=employees[idx];
-  if(!confirm(`Supprimer ${emp.name}?`))return;
-  employees.splice(idx,1); saveConfig(); renderAdminEmployees(); renderEmpSelector();
-  toast(`${emp.name} supprimée.`,'info');
-}
-
-function renderEmailList(){
-  const el=document.getElementById('emailList'); el.innerHTML='';
-  const withEmail=employees.filter(e=>e.email&&!e.name.includes('2e soir'));
-  if(!withEmail.length){el.innerHTML='<p style="color:var(--muted);font-style:italic">Aucun courriel enregistré.</p>';return;}
-  withEmail.forEach(e=>{
-    el.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-      <span style="font-weight:500">${e.name}</span>
-      <span style="color:var(--muted);font-family:'DM Mono',monospace;font-size:11px">${e.email}</span>
-    </div>`;
-  });
-}
-
-function renderAdminDentists(){
-  const list=document.getElementById('dentList'); list.innerHTML='';
-  dentists.forEach((d,idx)=>{
-    const div=document.createElement('div'); div.className='list-item';
-    div.innerHTML=`<span class="list-item-color" style="background:${d.color}"></span>
-      <span class="list-item-name">${d.full||d.short}</span>
-      <span class="list-item-cat">(${d.key})</span>
-      <button class="item-del" onclick="deleteDentist(${idx})">✕</button>`;
-    list.appendChild(div);
-  });
-}
-
-let selectedColor='#1F4E79';
-function initColorPicker(){
-  document.querySelectorAll('.color-opt').forEach(opt=>{
-    opt.addEventListener('click',()=>{
-      document.querySelectorAll('.color-opt').forEach(o=>o.classList.remove('selected'));
-      opt.classList.add('selected'); selectedColor=opt.dataset.color;
-    });
-  });
-}
-
-function addDentist(){
-  const short=document.getElementById('newDentName').value.trim();
-  const full=document.getElementById('newDentFull').value.trim();
-  const key=document.getElementById('newDentKey').value.trim().replace(/\s+/g,'_');
-  if(!short||!key){toast('Nom court et clé requis.','err');return;}
-  if(dentists.find(d=>d.key===key)){toast('Cette clé existe déjà.','warn');return;}
-  const color=selectedColor||'#374151';
-  const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
-  const light=`#${Math.min(255,r+140).toString(16).padStart(2,'0')}${Math.min(255,g+140).toString(16).padStart(2,'0')}${Math.min(255,b+140).toString(16).padStart(2,'0')}`;
-  dentists.push({key,short,full:full||short,color,light});
-  saveConfig(); injectDentistColors(); renderAdminDentists();
-  document.getElementById('newDentName').value='';
-  document.getElementById('newDentFull').value='';
-  document.getElementById('newDentKey').value='';
-  toast(`${short} ajouté ✓`,'ok');
-  if(currentEmployee) renderDays();
-}
-
-function deleteDentist(idx){
-  const d=dentists[idx];
-  if(!confirm(`Supprimer ${d.short}?`))return;
-  dentists.splice(idx,1); saveConfig(); injectDentistColors(); renderAdminDentists();
-  if(currentEmployee) renderDays();
-  toast(`${d.short} supprimé.`,'info');
-}
-
-function saveSettings(){
-  settings.email=document.getElementById('settingEmail').value.trim()||DEFAULT_SETTINGS.email;
-  settings.anchorDate=document.getElementById('settingAnchor').value||DEFAULT_SETTINGS.anchorDate;
-  saveConfig();
-  document.getElementById('schedEmail').textContent=settings.email;
-  updatePeriodUI(); updateNextSendLabel();
-  toast('Paramètres enregistrés ✓','ok'); closeAdmin();
-}
-
-function injectDentistColors(){
-  let style=document.getElementById('dent-colors')||document.createElement('style');
-  style.id='dent-colors';
-  style.textContent=dentists.map(d=>`
-    .dent-pill.${d.key}{background:${d.color};}
-    .ds-pill.${d.key}{background:${d.light||'#eee'};color:${d.color};}
-  `).join('');
-  document.head.appendChild(style);
-}
-
-function renderEmpSelector(){
-  // The selector is now the LOGIN selector — nothing to do here after login
-  // Admin panel has its own list
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  TOAST
-// ═══════════════════════════════════════════════════════════════
-function toast(msg,type='info'){
-  const c=document.getElementById('toasts');
-  const t=document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg; c.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4500);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', async () => {
-  loadConfig();
-  ['ADMIN','FORMATION'].forEach(k=>{
-    if(!dentists.find(d=>d.key===k)){const d=DEFAULT_DENTISTS.find(x=>x.key===k);if(d)dentists.push(d);}
-  });
-
-  // Charger les courriels depuis Supabase pour pré-remplir lors de la connexion
-  try {
-    const rows = await sbFetch('employe_emails');
-    rows.forEach(r => {
-      const emp = employees.find(e => e.name === r.emp_name);
-      if (emp && r.email) emp.email = r.email;
-    });
-    saveConfig(); // Mettre à jour le cache local
-  } catch(e) {
-    console.warn('Impossible de charger les courriels depuis Supabase:', e);
-  }
-
-  hideLoadingOverlay();
-  populateLoginSelector();
-  document.getElementById('loginPage').style.display = '';
+const emptyStore = () => ({
+  employees: {},
+  evaluations: {},
+  evaluators: JSON.parse(JSON.stringify(DEFAULT_EVALUATORS)),
 });
-</script>
-</body>
-</html>
+
+// ── FICTIONAL PREVIEW DATA ────────────────────────────────────
+function mkFT(ei) {
+  const profiles = [[5,60,35],[30,55,15],[2,40,58],[10,55,35]];
+  const p = profiles[ei] || profiles[0];
+  const tasks = {}; let gi = 0;
+  LEVELS_DATA.forEach(l => l.sections.forEach(s => s.tasks.forEach((task,i) => {
+    const k = tkey(l.id,s.title,i);
+    const skip = l.id > ei+2 && gi%3===0;
+    let appr = null;
+    if (!skip) { const r=(gi*37+ei*17)%100; appr=r<p[0]?"at":r<p[0]+p[1]?"ok":"ex"; }
+    tasks[k] = {appr, comment: appr==="at"?"À préciser lors de la rétroaction":"", lvlId:l.id, label:task};
+    gi++;
+  })));
+  return tasks;
+}
+const FICTION_STORE = {
+  employees: {f1:{id:"f1",name:"Sophie Beauchemin",anciennete:1},f2:{id:"f2",name:"Laura Thibodeau",anciennete:0},f3:{id:"f3",name:"Isabelle Fontaine",anciennete:3},f4:{id:"f4",name:"Maude Pelletier",anciennete:2}},
+  evaluations: {
+    e1:{id:"e1",empId:"f1",dateStart:"2024-01-08",dateEnd:"2024-03-29",evaluateur:"ev6",anciennete:1,niveauLevel:3,tasks:mkFT(0)},
+    e2:{id:"e2",empId:"f1",dateStart:"2025-01-06",dateEnd:"2025-03-28",evaluateur:"ev6",anciennete:1,niveauLevel:3,tasks:mkFT(0)},
+    e3:{id:"e3",empId:"f2",dateStart:"2024-06-03",dateEnd:"2024-08-30",evaluateur:"ev1",anciennete:0,niveauLevel:1,tasks:mkFT(1)},
+    e4:{id:"e4",empId:"f3",dateStart:"2024-03-04",dateEnd:"2024-06-28",evaluateur:"ev6",anciennete:3,niveauLevel:4,tasks:mkFT(2)},
+    e5:{id:"e5",empId:"f3",dateStart:"2025-02-03",dateEnd:"2025-04-30",evaluateur:"ev6",anciennete:3,niveauLevel:4,tasks:mkFT(2)},
+    e6:{id:"e6",empId:"f4",dateStart:"2024-09-02",dateEnd:"2024-11-29",evaluateur:"ev2",anciennete:2,niveauLevel:2,tasks:mkFT(3)},
+  },
+  evaluators: DEFAULT_EVALUATORS,
+};
+
+// ── EMAIL EXPORT ──────────────────────────────────────────────
+function exportEmail(emp, evals, evMap) {
+  const lines = [`CLINIQUE DENTAIRE ST-ÉTIENNE`, `Sommaire — ${emp.name}`, `Généré le ${fmtD(todayISO())}`, "─".repeat(50), ""];
+  evals.forEach((ev,i) => {
+    const s = scoreOf(ev.tasks); const evN = evMap[ev.evaluateur]||ev.evaluateur||"—";
+    lines.push(`ÉVALUATION ${i+1} — ${fmtS(ev.dateStart)} au ${fmtS(ev.dateEnd)}`);
+    lines.push(`Évaluateur : ${evN} · Niveau ${ev.niveauLevel} · ${ANC_LABELS[ev.anciennete||0]}`);
+    lines.push(`Résumé : ${s.total} tâches | ${s.at} à travailler | ${s.ok} satisfait | ${s.ex} surpasse`, "");
+    const at = Object.values(ev.tasks).filter(t=>t.appr==="at");
+    if(at.length){lines.push("  POINTS À TRAVAILLER");at.forEach(t=>{lines.push(`  • ${t.label}`);if(t.comment)lines.push(`    → ${t.comment}`);});lines.push("");}
+    const ex = Object.values(ev.tasks).filter(t=>t.appr==="ex");
+    if(ex.length){lines.push("  SURPASSE LES ATTENTES");ex.forEach(t=>lines.push(`  ★ ${t.label}`));lines.push("");}
+    lines.push("─".repeat(40),"");
+  });
+  window.location.href = `mailto:?subject=${encodeURIComponent(`Évaluation — ${emp.name} — CDS St-Étienne`)}&body=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+// ── SVG CHARTS ────────────────────────────────────────────────
+function LineChart({data}) {
+  if (!data || data.length < 2) return <p style={{color:C.textL,fontSize:12,textAlign:"center",padding:18}}>Au moins 2 évaluations nécessaires pour afficher le graphique.</p>;
+  const W=520,H=190,PL=38,PT=14,PR=14,PB=38,cW=W-PL-PR,cH=H-PT-PB;
+  const series=[{k:"ex",c:C.green,n:"Surpasse %"},{k:"ok",c:C.orange,n:"Satisfait %"},{k:"at",c:C.red,n:"À travailler %"}];
+  const x = (i) => PL + i*(cW/(data.length-1));
+  const y = (v) => PT + cH*(1-v/100);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block",margin:"0 auto"}}>
+      {[0,25,50,75,100].map(v=><g key={v}><line x1={PL} y1={y(v)} x2={PL+cW} y2={y(v)} stroke={C.gray} strokeWidth="1"/><text x={PL-4} y={y(v)+4} textAnchor="end" fontSize="9" fill={C.textL}>{v}%</text></g>)}
+      {data.map((d,i)=><text key={i} x={x(i)} y={H-6} textAnchor="middle" fontSize="9" fill={C.textL}>{d.dt}</text>)}
+      {series.map(sr=>(
+        <g key={sr.k}>
+          <polyline points={data.map((d,i)=>`${x(i)},${y(d[sr.k])}`).join(" ")} fill="none" stroke={sr.c} strokeWidth="2.5" strokeLinejoin="round"/>
+          {data.map((d,i)=><circle key={i} cx={x(i)} cy={y(d[sr.k])} r="4" fill={sr.c}/>)}
+        </g>
+      ))}
+      {series.map((sr,i)=>(
+        <g key={sr.k}>
+          <circle cx={PL+i*82+4} cy={H-22} r="4" fill={sr.c}/>
+          <text x={PL+i*82+11} y={H-18} fontSize="9" fill={C.textM}>{sr.n}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function RadarChart({data}) {
+  if (!data || !data.some(d=>d.score>0)) return null;
+  const W=240,H=240,CX=120,CY=120,R=85,n=data.length;
+  const pt = (i,r) => { const a=(i/n)*2*Math.PI-Math.PI/2; return `${CX+r*Math.cos(a)},${CY+r*Math.sin(a)}`; };
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block",margin:"0 auto"}}>
+      {[25,50,75,100].map(v=><polygon key={v} points={data.map((_,i)=>pt(i,R*v/100)).join(" ")} fill="none" stroke={C.gray} strokeWidth="1"/>)}
+      {data.map((_,i)=><line key={i} x1={CX} y1={CY} x2={pt(i,R).split(",")[0]} y2={pt(i,R).split(",")[1]} stroke={C.gray} strokeWidth="1"/>)}
+      <polygon points={data.map((d,i)=>pt(i,R*d.score/100)).join(" ")} fill="rgba(42,127,127,.2)" stroke={C.teal} strokeWidth="2"/>
+      {data.map((d,i)=>{ const a=(i/n)*2*Math.PI-Math.PI/2; const lx=CX+(R+17)*Math.cos(a); const ly=CY+(R+17)*Math.sin(a); return <text key={i} x={lx} y={ly+4} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.textM}>{d.lv}</text>; })}
+    </svg>
+  );
+}
+
+// ── SMALL COMPONENTS ──────────────────────────────────────────
+const Card = ({children,style={}}) => <div style={{background:C.white,borderRadius:14,boxShadow:"0 4px 18px rgba(26,39,68,.09)",padding:20,marginBottom:16,border:`1px solid ${C.gray}`,...style}}>{children}</div>;
+const SH = ({title,sub}) => <div style={{marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:C.navy,marginBottom:3}}>{title}</div><div style={{fontSize:12,color:C.textL}}>{sub}</div></div>;
+const FL = ({children}) => <div style={{fontSize:14,fontWeight:700,color:C.navy,marginBottom:11}}>{children}</div>;
+const Lbl = ({children}) => <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:C.textM,marginBottom:4}}>{children}</div>;
+const Btn = ({children,onClick,style={}}) => <button onClick={onClick} style={{padding:"9px 18px",borderRadius:8,border:"none",background:C.teal,color:C.white,fontWeight:700,fontSize:12,cursor:"pointer",...style}}>{children}</button>;
+const Pill = ({n,color,label}) => <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:15,background:`${color}20`,color,border:`1px solid ${color}44`}}>{n} {label}</span>;
+const Inp = ({style={},...props}) => <input {...props} style={{width:"100%",padding:"9px 11px",border:`1.5px solid ${C.gray}`,borderRadius:7,fontSize:13,color:C.textD,background:C.cream,outline:"none",...style}}/>;
+const Sel = ({children,...props}) => <select {...props} style={{width:"100%",padding:"9px 11px",border:`1.5px solid ${C.gray}`,borderRadius:7,fontSize:13,color:C.textD,background:C.cream,outline:"none"}}>{children}</select>;
+const ScoreTile = ({n,label,color,dark=false}) => <div style={{borderRadius:10,padding:"11px",background:dark?color:`${color}18`,border:`1.5px solid ${dark?"transparent":`${color}33`}`}}><div style={{fontSize:24,fontWeight:700,color:dark?C.gold:color,lineHeight:1}}>{n}</div><div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:dark?"rgba(255,255,255,.5)":color,marginTop:3}}>{label}</div></div>;
+
+function ProgBar({s}) {
+  if (!s.total) return null;
+  return <div style={{height:5,borderRadius:3,background:C.gray,overflow:"hidden",display:"flex",marginTop:8}}>
+    {s.at>0&&<div style={{height:"100%",background:C.red,width:pct(s.at,s.total)+"%"}}/>}
+    {s.ok>0&&<div style={{height:"100%",background:C.orange,width:pct(s.ok,s.total)+"%"}}/>}
+    {s.ex>0&&<div style={{height:"100%",background:C.green,width:pct(s.ex,s.total)+"%"}}/>}
+  </div>;
+}
+
+function Pills({s}) {
+  if (!s.total) return <span style={{fontSize:11,color:C.textL}}>—</span>;
+  return <>{s.at>0&&<Pill n={s.at} color={C.red} label="à trav."/>} {s.ok>0&&<Pill n={s.ok} color={C.orange} label="satisf."/>} {s.ex>0&&<Pill n={s.ex} color={C.green} label="surp."/>}</>;
+}
+
+// ── LEVEL BLOCK ───────────────────────────────────────────────
+function LevelBlock({level:l, tasks, setAppr, setComment, open, onToggle}) {
+  const lt = Object.entries(tasks).filter(([,v])=>v.lvlId===l.id);
+  const ev = lt.filter(([,v])=>v.appr).length;
+  const lc = l.id===5 ? C.navy : C.teal;
+  return (
+    <div style={{border:`1.5px solid ${l.id===5?"rgba(26,39,68,.2)":C.gray}`,borderRadius:11,overflow:"hidden",marginBottom:7}}>
+      <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:9,padding:"11px 14px",cursor:"pointer",background:open?(l.id===5?"rgba(26,39,68,.05)":"rgba(42,127,127,.05)"):C.cream,borderBottom:open?`1px solid ${C.gray}`:"none"}}>
+        <div style={{width:30,height:30,borderRadius:7,background:lc,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{l.id}</div>
+        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:C.navy}}>Niveau {l.id} — {l.title}</div><div style={{fontSize:10,color:C.textL,marginTop:1}}>{l.id<5?"Inclut niveaux inférieurs · ":""}{ev}/{lt.length} évaluées</div></div>
+        <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:14,background:l.tbd?C.navy:C.teal,color:l.tbd?C.gold:C.white}}>{l.tbd?"Prime à déterm.":"+"+l.bonus+" $/h"}</span>
+        <span style={{fontSize:11,color:C.textL,transition:"transform .2s",display:"inline-block",transform:open?"rotate(180deg)":"none"}}>▾</span>
+      </div>
+      {open && (
+        <div style={{padding:"12px 14px"}}>
+          {l.id>1 && <div style={{fontSize:10,color:C.textL,fontStyle:"italic",padding:"4px 8px",background:"rgba(42,127,127,.04)",borderRadius:5,marginBottom:10}}>✓ Inclut toutes les tâches des niveaux 1 à {l.id-1}</div>}
+          {l.sections.map(sec=>(
+            <div key={sec.title} style={{marginBottom:12}}>
+              <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:lc,marginBottom:5,paddingBottom:3,borderBottom:`1px solid ${l.id===5?"rgba(26,39,68,.12)":"rgba(42,127,127,.14)"}`}}>{sec.title}</div>
+              {sec.tasks.map((task,i)=>{
+                const k = tkey(l.id,sec.title,i);
+                const st = tasks[k]||{appr:null,comment:""};
+                const bg = st.appr==="at"?C.redP:st.appr==="ok"?C.orangeP:st.appr==="ex"?C.greenP:C.white;
+                const bc = st.appr==="at"?"rgba(192,57,43,.25)":st.appr==="ok"?"rgba(230,126,34,.2)":st.appr==="ex"?"rgba(39,174,96,.2)":"transparent";
+                return (
+                  <div key={k} style={{borderRadius:7,border:`1.5px solid ${bc}`,overflow:"hidden",marginBottom:3}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7,padding:"6px 8px",background:bg,flexWrap:"wrap"}}>
+                      <span style={{flex:1,fontSize:12,color:C.textM,lineHeight:1.4}}>{task}</span>
+                      <div style={{display:"flex",gap:3,flexShrink:0}}>
+                        {[["at","À travailler",C.red],["ok","Satisfait",C.orange],["ex","Surpasse",C.green]].map(([a,lbl,c])=>(
+                          <button key={a} onClick={()=>setAppr(k,a)} style={{padding:"3px 7px",borderRadius:13,fontSize:9,fontWeight:600,cursor:"pointer",border:`1.5px solid ${c}`,background:st.appr===a?c:"transparent",color:st.appr===a?C.white:c,opacity:st.appr&&st.appr!==a?.4:1,whiteSpace:"nowrap"}}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {st.appr==="at" && (
+                      <div style={{padding:"5px 8px 8px",background:C.redP,borderTop:"1px solid rgba(192,57,43,.11)"}}>
+                        <div style={{fontSize:9,fontWeight:700,color:C.red,textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>📝 Plan d'action</div>
+                        <textarea value={st.comment||""} onChange={e=>setComment(k,e.target.value)} placeholder="Points à améliorer, objectifs, ressources…" style={{width:"100%",padding:"5px 8px",border:`1.5px solid rgba(192,57,43,.22)`,borderRadius:5,fontSize:11,color:C.textD,background:C.white,minHeight:40,resize:"vertical",outline:"none"}}/>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LEVEL SELECTOR ────────────────────────────────────────────
+function LevelSelector({current, onChange}) {
+  const btns = [{id:0,n:"Aucun",r:"base"}, ...LEVELS_DATA.map(l=>({id:l.id,n:`${l.id}`,r:l.tbd?"À déterm.":"+"+l.bonus+"$/h"}))];
+  return (
+    <div style={{display:"flex",border:`1.5px solid ${C.gray}`,borderRadius:9,overflow:"hidden",marginBottom:11}}>
+      {btns.map(b=>{
+        const isA=current===b.id, isI=b.id>0&&b.id<current;
+        return <div key={b.id} onClick={()=>onChange(b.id)} style={{flex:1,padding:"9px 3px",textAlign:"center",cursor:"pointer",background:isA?(b.id===5?C.navy:C.teal):isI?"rgba(42,127,127,.1)":C.cream,borderRight:`1px solid ${C.gray}`,transition:"background .15s"}}>
+          <div style={{fontSize:b.id===0?10:15,fontWeight:700,color:isA?C.white:isI?C.teal:C.navy}}>{b.n}</div>
+          <div style={{fontSize:9,fontWeight:700,color:isA?(b.id===5?C.gold:"rgba(255,255,255,.9)"):C.teal,marginTop:2}}>{b.r}</div>
+        </div>;
+      })}
+    </div>
+  );
+}
+
+function RatePanel({anc, niv}) {
+  const base=BASE_RATES[anc], bonus=niv>0&&niv<5?LEVELS_DATA[niv-1].bonus:0, total=base+bonus;
+  return (
+    <div style={{background:`linear-gradient(135deg,${C.navy},${C.navyL})`,borderRadius:10,padding:"13px 17px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+        {[["Base",`${base.toFixed(2)} $/h`],["Prime",niv===5?"À déterm.":"+"+bonus.toFixed(2)+" $/h"],["Total",niv===5?`${base.toFixed(2)} + nég.`:total.toFixed(2)+" $/h"]].map(([l,v])=>(
+          <div key={l}><div style={{fontSize:9,color:"rgba(255,255,255,.4)"}}>{l}</div><div style={{fontWeight:700,color:C.gold,fontSize:13}}>{v}</div></div>
+        ))}
+      </div>
+      <div style={{textAlign:"right"}}><div style={{fontSize:9,color:"rgba(255,255,255,.35)",textTransform:"uppercase",letterSpacing:".1em"}}>Taux</div><div style={{fontSize:28,fontWeight:700,color:C.gold,lineHeight:1}}>{niv===5?"—":total.toFixed(2)}</div><div style={{fontSize:10,color:"rgba(255,255,255,.3)"}}>{niv===5?"prime nég.":"$/heure"}</div></div>
+    </div>
+  );
+}
+
+// ── VIEWS ─────────────────────────────────────────────────────
+function Dashboard({store, setView, setSelEmp}) {
+  const emps = Object.values(store.employees);
+  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
+  const getEvals = eid => Object.values(store.evaluations).filter(e=>e.empId===eid).sort((a,b)=>a.dateStart.localeCompare(b.dateStart));
+  if (!emps.length) return <Card><div style={{textAlign:"center",padding:48}}><div style={{fontSize:42,marginBottom:12}}>📋</div><div style={{fontWeight:600,fontSize:16,color:C.textM,marginBottom:12}}>Aucune secrétaire enregistrée</div><Btn onClick={()=>setView("new")}>✏️ Créer la première évaluation</Btn></div></Card>;
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(270px,1fr))",gap:12}}>
+      {emps.map((emp,i)=>{
+        const evals=getEvals(emp.id), last=evals[evals.length-1], s=last?scoreOf(last.tasks):null, col=empColor(i);
+        const evN=last?evMap[last.evaluateur]||last.evaluateur:"";
+        return (
+          <div key={emp.id} style={{background:C.white,borderRadius:14,boxShadow:"0 3px 14px rgba(26,39,68,.09)",border:`1px solid ${C.gray}`,overflow:"hidden"}}>
+            <div style={{background:col,padding:"13px 15px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:38,height:38,borderRadius:9,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:C.white,flexShrink:0}}>{emp.name.charAt(0)}</div>
+              <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:C.white}}>{emp.name}</div><div style={{fontSize:11,color:"rgba(255,255,255,.65)"}}>{evals.length} éval. · {ANC_LABELS[emp.anciennete||0]}</div></div>
+            </div>
+            <div style={{padding:"11px 15px"}}>
+              {last&&s ? <>
+                <div style={{fontSize:11,color:C.textL,marginBottom:4}}>{fmtS(last.dateStart)} → {fmtS(last.dateEnd)}{evN?` · ${evN}`:""}</div>
+                <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}><Pills s={s}/></div>
+                <ProgBar s={s}/>
+              </> : <div style={{fontSize:12,color:C.textL}}>Aucune évaluation.</div>}
+              <div style={{display:"flex",gap:6,marginTop:10}}>
+                <button onClick={()=>{setSelEmp(emp.id);setView("hist");}} style={{flex:1,padding:"6px",borderRadius:7,border:`1px solid ${C.gray}`,background:C.cream,cursor:"pointer",fontSize:11,fontWeight:600,color:C.textM}}>📋 Historique</button>
+                <button onClick={()=>{setSelEmp(emp.id);setView("evol");}} style={{flex:1,padding:"6px",borderRadius:7,border:"none",background:col,cursor:"pointer",fontSize:11,fontWeight:600,color:C.white}}>📈 Évolution</button>
+                {evals.length>0&&<button onClick={()=>exportEmail(emp,evals,evMap)} style={{padding:"6px 9px",borderRadius:7,border:"none",background:C.navy,cursor:"pointer",fontSize:11,color:C.goldL}}>✉️</button>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NewEvaluation({store, persist, setView}) {
+  const empList = Object.values(store.employees);
+  const [empId, setEmpId] = useState("");
+  const [empName, setEmpName] = useState("");
+  const [evalId, setEvalId] = useState(store.evaluators[0]?.id||"ev1");
+  const [autreEv, setAutreEv] = useState("");
+  const [ds, setDs] = useState(todayISO());
+  const [de, setDe] = useState(todayISO());
+  const [anc, setAnc] = useState(0);
+  const [niv, setNiv] = useState(0);
+  const [tasks, setTasks] = useState(buildBlankTasks());
+  const [openLvls, setOpenLvls] = useState({1:true});
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const selEmp = id => { if(!id){setEmpId("");setEmpName("");return;} setEmpId(id); const e=store.employees[id]; setEmpName(e.name); setAnc(e.anciennete||0); };
+
+  const validate = (s1,e1,eid) => {
+    if(s1>e1){setErr("La date de début doit être avant la date de fin.");return false;}
+    const tid=eid||(Object.keys(store.employees).find(k=>store.employees[k].name.toLowerCase()===empName.trim().toLowerCase()));
+    if(tid){const c=Object.values(store.evaluations).find(e=>e.empId===tid&&overlaps(s1,e1,e.dateStart,e.dateEnd));if(c){setErr(`Chevauchement avec l'évaluation du ${fmtS(c.dateStart)} au ${fmtS(c.dateEnd)}.`);return false;}}
+    setErr(""); return true;
+  };
+
+  const setAppr = (k,a) => setTasks(p=>({...p,[k]:{...p[k],appr:p[k].appr===a?null:a}}));
+  const setComment = (k,v) => setTasks(p=>({...p,[k]:{...p[k],comment:v}}));
+  const sc = scoreOf(tasks);
+
+  const doSave = async () => {
+    if(!empName.trim()){alert("Veuillez saisir le nom de la secrétaire.");return;}
+    const evN=evalId==="ev7"?autreEv:(store.evaluators.find(e=>e.id===evalId)?.name||"");
+    if(!evN.trim()){alert("Veuillez saisir l'évaluateur.");return;}
+    if(!validate(ds,de,empId))return;
+    setSaving(true);
+    const ns = JSON.parse(JSON.stringify(store));
+    let rid = empId;
+    if(!rid){const m=Object.entries(ns.employees).find(([,e])=>e.name.toLowerCase()===empName.trim().toLowerCase());if(m)rid=m[0];else{rid="emp_"+Date.now();ns.employees[rid]={id:rid,name:empName.trim(),anciennete:anc};}}
+    ns.employees[rid].anciennete=anc;
+    const eid="eval_"+Date.now();
+    ns.evaluations[eid]={id:eid,empId:rid,dateStart:ds,dateEnd:de,evaluateur:evalId==="ev7"?autreEv.trim():evalId,anciennete:anc,niveauLevel:niv,tasks};
+    await persist(ns);
+    setSaving(false); setSaved(true);
+    setTimeout(()=>setView("hist"),1400);
+  };
+
+  if(saved) return <Card><div style={{textAlign:"center",padding:40}}><div style={{fontSize:42,marginBottom:12}}>✅</div><div style={{fontSize:19,color:C.teal,fontWeight:700}}>Évaluation enregistrée !</div></div></Card>;
+
+  const days = ds&&de&&ds<=de ? Math.round((new Date(de)-new Date(ds))/86400000) : null;
+
+  return (
+    <div>
+      <SH title="Nouvelle évaluation" sub="Définissez la période, l'évaluateur et complétez la grille."/>
+      <Card>
+        <FL>1. Identification & période</FL>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:11,marginBottom:13}}>
+          <div><Lbl>Secrétaire évaluée</Lbl>
+            {empList.length>0&&<Sel value={empId} onChange={e=>selEmp(e.target.value)} style={{marginBottom:7}}><option value="">— Nouvelle secrétaire —</option>{empList.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</Sel>}
+            {!empId&&<Inp placeholder="Prénom et nom" value={empName} onChange={e=>setEmpName(e.target.value)}/>}
+          </div>
+          <div><Lbl>Évalué(e) par</Lbl>
+            <Sel value={evalId} onChange={e=>setEvalId(e.target.value)}>{(store.evaluators||[]).map(ev=><option key={ev.id} value={ev.id}>{ev.name}{ev.role?` — ${ev.role}`:""}</option>)}</Sel>
+            {evalId==="ev7"&&<Inp style={{marginTop:7}} placeholder="Nom" value={autreEv} onChange={e=>setAutreEv(e.target.value)}/>}
+          </div>
+          <div><Lbl>Début de la période</Lbl><Inp type="date" value={ds} onChange={e=>{setDs(e.target.value);validate(e.target.value,de,empId);}}/></div>
+          <div><Lbl>Fin de la période</Lbl><Inp type="date" value={de} onChange={e=>{setDe(e.target.value);validate(ds,e.target.value,empId);}}/></div>
+          <div><Lbl>Années d'expérience</Lbl><Sel value={anc} onChange={e=>setAnc(+e.target.value)}>{ANC_LABELS.map((l,i)=><option key={i} value={i}>{l}</option>)}</Sel></div>
+        </div>
+        {ds&&de&&ds<=de&&!err&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"9px 13px",background:"rgba(42,127,127,.06)",border:"1px solid rgba(42,127,127,.19)",borderRadius:9,marginBottom:12,fontSize:13}}>📅 <span style={{color:C.teal,fontWeight:600}}>{fmtD(ds)} → {fmtD(de)}</span><span style={{fontSize:11,color:C.textL,marginLeft:"auto"}}>{days} jours</span></div>}
+        {err&&<div style={{padding:"9px 13px",background:C.redP,border:"1px solid rgba(192,57,43,.19)",borderRadius:9,marginBottom:12,fontSize:12,color:C.red,fontWeight:500}}>⚠️ {err}</div>}
+        <Lbl>Niveau de responsabilité</Lbl>
+        <LevelSelector current={niv} onChange={v=>{setNiv(v);}}/>
+        <RatePanel anc={anc} niv={niv}/>
+      </Card>
+      <Card>
+        <FL>2. Résumé en temps réel</FL>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+          <ScoreTile n={sc.total} label="Évaluées" color={C.navy} dark/>
+          <ScoreTile n={sc.at} label="À travailler" color={C.red}/>
+          <ScoreTile n={sc.ok} label="Satisfait" color={C.orange}/>
+          <ScoreTile n={sc.ex} label="Surpasse" color={C.green}/>
+        </div>
+        <ProgBar s={sc}/>
+      </Card>
+      <Card>
+        <FL>3. Grille d'évaluation</FL>
+        <div style={{display:"flex",gap:9,flexWrap:"wrap",padding:"7px 11px",background:C.cream,borderRadius:7,border:`1px solid ${C.gray}`,marginBottom:14,alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:700,color:C.textM}}>Appréciation :</span>
+          {[[C.red,"À travailler"],[C.orange,"Satisfait les critères"],[C.green,"Surpasse les attentes"],[C.gray,"Non évalué"]].map(([c,l])=>(
+            <span key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:7,height:7,borderRadius:"50%",background:c,flexShrink:0}}/><span style={{color:c===C.gray?C.textL:c}}>{l}</span></span>
+          ))}
+        </div>
+        {LEVELS_DATA.map(l=><LevelBlock key={l.id} level={l} tasks={tasks} setAppr={setAppr} setComment={setComment} open={!!openLvls[l.id]} onToggle={()=>setOpenLvls(p=>({...p,[l.id]:!p[l.id]}))}/>)}
+      </Card>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:8,paddingBottom:36}}>
+        <button onClick={()=>setView("db")} style={{padding:"9px 18px",borderRadius:8,border:`1.5px solid ${C.gray}`,background:C.white,cursor:"pointer",fontSize:13,color:C.textM,fontWeight:600}}>Annuler</button>
+        <Btn onClick={doSave} style={{opacity:saving||!!err?.5:1,cursor:saving||!!err?"not-allowed":"pointer",background:err?C.gray:C.teal}}>{saving?"Enregistrement…":"💾 Enregistrer"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function History({store, selEmp, setSelEmp}) {
+  const [expanded, setExpanded] = useState(null);
+  const empList = Object.values(store.employees);
+  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
+  const filtered = selEmp ? Object.values(store.evaluations).filter(e=>e.empId===selEmp).sort((a,b)=>b.dateStart.localeCompare(a.dateStart)) : Object.values(store.evaluations).sort((a,b)=>b.dateStart.localeCompare(a.dateStart));
+  return (
+    <div>
+      <SH title="Historique des évaluations" sub="Consultez toutes les évaluations par secrétaire."/>
+      <Card>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:700,color:C.textM}}>Filtrer :</span>
+          {[{id:null,name:"Toutes"},...empList].map((e,i)=>(
+            <button key={e.id||"all"} onClick={()=>setSelEmp(e.id)} style={{padding:"4px 11px",borderRadius:14,border:`1.5px solid ${selEmp===e.id?(i>0?empColor(i-1):C.teal):"#e8e3d9"}`,background:selEmp===e.id?(i>0?empColor(i-1):C.teal):C.cream,color:selEmp===e.id?C.white:C.textM,fontSize:11,fontWeight:600,cursor:"pointer"}}>{e.name}</button>
+          ))}
+        </div>
+      </Card>
+      {!filtered.length ? <Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Aucune évaluation.</div></Card> : filtered.map(ev=>{
+        const emp=store.employees[ev.empId]; const s=scoreOf(ev.tasks); const isOpen=expanded===ev.id;
+        const empI=empList.findIndex(e=>e.id===ev.empId); const col=empColor(empI);
+        const evN=evMap[ev.evaluateur]||ev.evaluateur||"—";
+        return (
+          <Card key={ev.id} style={{padding:0,overflow:"hidden"}}>
+            <div onClick={()=>setExpanded(isOpen?null:ev.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 15px",cursor:"pointer",background:isOpen?`${col}10`:C.white,borderBottom:isOpen?`1px solid ${C.gray}`:"none"}}>
+              <div style={{width:34,height:34,borderRadius:8,background:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:C.white,flexShrink:0}}>{emp?.name?.charAt(0)||"?"}</div>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,color:C.navy}}>{emp?.name||"—"}</div><div style={{fontSize:11,color:C.textL,marginTop:2}}><span style={{background:`${col}22`,color:col,padding:"1px 7px",borderRadius:17,fontWeight:600,marginRight:5}}>📅 {fmtS(ev.dateStart)} → {fmtS(ev.dateEnd)}</span>Par {evN} · Niveau {ev.niveauLevel}</div></div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}><Pills s={s}/></div>
+              <span style={{fontSize:13,color:C.textL,marginLeft:6}}>{isOpen?"▴":"▾"}</span>
+            </div>
+            {isOpen && (
+              <div style={{padding:"14px 18px"}}>
+                <div style={{display:"flex",gap:12,flexWrap:"wrap",padding:"8px 12px",background:C.cream,borderRadius:7,marginBottom:13,fontSize:12}}>
+                  <span><b>Période :</b> {fmtD(ev.dateStart)} → {fmtD(ev.dateEnd)}</span>
+                  <span><b>Évaluateur :</b> {evN}</span>
+                  <span><b>Ancienneté :</b> {ANC_LABELS[ev.anciennete||0]}</span>
+                  <span><b>Niveau :</b> {ev.niveauLevel===5?"5 (prime à déterm.)":ev.niveauLevel===0?"Aucun":"Niveau "+ev.niveauLevel}</span>
+                </div>
+                {LEVELS_DATA.map(l=>{
+                  const lt=Object.entries(ev.tasks).filter(([,v])=>v.lvlId===l.id&&v.appr); if(!lt.length) return null;
+                  return <div key={l.id} style={{marginBottom:12}}>
+                    <div style={{fontWeight:700,fontSize:12,color:l.id===5?C.navy:C.teal,borderBottom:`1px solid ${C.gray}`,paddingBottom:3,marginBottom:6}}>Niveau {l.id} — {l.title}</div>
+                    {lt.map(([k,t])=>{ const isAt=t.appr==="at",isOk=t.appr==="ok"; const bg=isAt?C.redP:isOk?C.orangeP:C.greenP; const tc=isAt?C.red:isOk?C.orange:C.green; const tl=isAt?"À travailler":isOk?"Satisfait":"Surpasse";
+                      return <div key={k} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"5px 7px",borderRadius:6,marginBottom:3,background:bg}}>
+                        <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:14,background:tc,color:C.white,flexShrink:0,marginTop:2}}>{tl}</span>
+                        <div><div style={{fontSize:12,color:C.textD}}>{t.label}</div>{isAt&&t.comment&&<div style={{fontSize:11,color:C.red,marginTop:2,fontStyle:"italic"}}>📝 {t.comment}</div>}</div>
+                      </div>;
+                    })}
+                  </div>;
+                })}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function Evolution({store, selEmp, setSelEmp}) {
+  const empList = Object.values(store.employees);
+  const ae = selEmp ? store.employees[selEmp] : null;
+  const evals = ae ? Object.values(store.evaluations).filter(e=>e.empId===selEmp).sort((a,b)=>a.dateStart.localeCompare(b.dateStart)) : [];
+  const chartData = evals.map(ev=>{ const s=scoreOf(ev.tasks); return {dt:fmtS(ev.dateStart),ex:pct(s.ex,s.total),ok:pct(s.ok,s.total),at:pct(s.at,s.total)}; });
+  const lastEval = evals[evals.length-1];
+  const radarData = lastEval ? LEVELS_DATA.map(l=>{ const lt=Object.values(lastEval.tasks).filter(t=>t.lvlId===l.id&&t.appr); const ex=lt.filter(t=>t.appr==="ex").length; const ok=lt.filter(t=>t.appr==="ok").length; const tot=lt.length; return {lv:"N"+l.id,score:tot>0?Math.round((ex*3+ok*2)/tot/3*100):0}; }) : [];
+  return (
+    <div>
+      <SH title="Évolution" sub="Progression de chaque secrétaire au fil des évaluations."/>
+      <Card>
+        <Lbl>Sélectionner une secrétaire</Lbl>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+          {empList.map((e,i)=><button key={e.id} onClick={()=>setSelEmp(e.id)} style={{padding:"7px 15px",borderRadius:14,border:`1.5px solid ${selEmp===e.id?empColor(i):C.gray}`,background:selEmp===e.id?empColor(i):C.cream,color:selEmp===e.id?C.white:C.textM,fontSize:12,fontWeight:600,cursor:"pointer"}}>{e.name}</button>)}
+        </div>
+      </Card>
+      {!ae&&<Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Sélectionnez une secrétaire.</div></Card>}
+      {ae&&!evals.length&&<Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Aucune évaluation pour {ae.name}.</div></Card>}
+      {ae&&evals.length>0&&<>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:16}}>
+          {[{l:"Évaluations",v:evals.length,c:empColor(empList.findIndex(e=>e.id===ae.id))},{l:"Première",v:evals[0].dateStart.slice(0,4),c:C.textM},{l:"Dernière",v:evals[evals.length-1].dateStart.slice(0,4),c:C.textM},...(evals.length>=2?[{l:"Évol. surpasse",v:(()=>{const f=scoreOf(evals[0].tasks);const l=scoreOf(evals[evals.length-1].tasks);const d=pct(l.ex,l.total)-pct(f.ex,f.total);return(d>=0?"+":"")+d+"%"})(),c:C.green}]:[])].map(({l,v,c})=>(
+            <div key={l} style={{background:C.white,borderRadius:11,padding:13,border:`1px solid ${C.gray}`,boxShadow:"0 2px 8px rgba(26,39,68,.05)"}}><div style={{fontSize:19,fontWeight:700,color:c,lineHeight:1}}>{v}</div><div style={{fontSize:9,color:C.textL,marginTop:3,textTransform:"uppercase",letterSpacing:".05em"}}>{l}</div></div>
+          ))}
+        </div>
+        <Card><FL>Évolution des appréciations</FL><LineChart data={chartData}/></Card>
+        {radarData.some(d=>d.score>0)&&<Card><FL>Profil par niveau — dernière évaluation</FL><RadarChart data={radarData}/></Card>}
+        <Card>
+          <FL>Chronologie des périodes</FL>
+          {evals.map((ev,i)=>{ const s=scoreOf(ev.tasks); const isL=i===evals.length-1;
+            return <div key={ev.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:9,background:isL?"rgba(42,127,127,.06)":C.cream,border:`1px solid ${isL?C.teal:C.gray}`,marginBottom:6,flexWrap:"wrap"}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:isL?C.teal:"#aaa",display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontSize:10,fontWeight:700,flexShrink:0}}>{ev.dateStart.slice(0,4)}</div>
+              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12,color:C.navy}}>{fmtS(ev.dateStart)} → {fmtS(ev.dateEnd)}</div><div style={{fontSize:10,color:C.textL}}>Niveau {ev.niveauLevel}</div></div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}><Pills s={s}/></div>
+              {isL&&<span style={{fontSize:9,background:C.teal,color:C.white,padding:"2px 6px",borderRadius:18}}>Dernière</span>}
+            </div>;
+          })}
+        </Card>
+      </>}
+    </div>
+  );
+}
+
+function Settings({store, persist}) {
+  const [newEvN, setNewEvN] = useState(""); const [newEvR, setNewEvR] = useState("");
+  const [newEmpN, setNewEmpN] = useState("");
+  const empList = Object.values(store.employees);
+  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
+
+  const addEv = async () => { if(!newEvN.trim()) return; const id="ev_"+Date.now(); const ns={...store,evaluators:[...(store.evaluators||[]),{id,name:newEvN.trim(),role:newEvR.trim()}]}; await persist(ns); setNewEvN(""); setNewEvR(""); };
+  const rmEv = async id => { if(!confirm("Retirer cet évaluateur ?")) return; await persist({...store,evaluators:(store.evaluators||[]).filter(e=>e.id!==id)}); };
+  const addEmp = async () => { if(!newEmpN.trim()) return; if(empList.some(e=>e.name.toLowerCase()===newEmpN.trim().toLowerCase())){alert("Cette secrétaire existe déjà.");return;} const id="emp_"+Date.now(); await persist({...store,employees:{...store.employees,[id]:{id,name:newEmpN.trim(),anciennete:0}}}); setNewEmpN(""); };
+  const rmEmp = async id => { const evs=Object.values(store.evaluations||{}).filter(e=>e.empId===id); if(!confirm(`Retirer cette secrétaire ?${evs.length?` (${evs.length} éval. supprimées)`:""}`)) return; const ns=JSON.parse(JSON.stringify(store)); delete ns.employees[id]; evs.forEach(e=>delete ns.evaluations[e.id]); await persist(ns); };
+
+  return (
+    <div>
+      <SH title="Paramètres" sub="Gérez les évaluateurs, les secrétaires et les exports."/>
+      <Card>
+        <FL>Évaluateurs</FL>
+        {(store.evaluators||[]).map(ev=>{
+          const isDef=["ev1","ev2","ev3","ev4","ev5","ev6","ev7"].includes(ev.id);
+          return <div key={ev.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:C.cream,borderRadius:8,border:`1px solid ${C.gray}`,marginBottom:6}}>
+            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:C.navy}}>{ev.name}</div>{ev.role&&<div style={{fontSize:11,color:C.textL}}>{ev.role}</div>}</div>
+            {isDef?<span style={{fontSize:9,color:C.textL,background:C.gray,padding:"2px 8px",borderRadius:18}}>Par défaut</span>:<button onClick={()=>rmEv(ev.id)} style={{padding:"3px 10px",borderRadius:6,border:`1px solid ${C.red}`,background:"transparent",color:C.red,cursor:"pointer",fontSize:11,fontWeight:600}}>Retirer</button>}
+          </div>;
+        })}
+        <div style={{background:C.greenP,border:`1.5px solid rgba(39,174,96,.2)`,borderRadius:10,padding:13,marginTop:12}}>
+          <div style={{fontWeight:600,fontSize:12,color:C.green,marginBottom:9}}>+ Ajouter un évaluateur</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:9,alignItems:"flex-end"}}>
+            <div><Lbl>Nom</Lbl><Inp placeholder="Prénom Nom" value={newEvN} onChange={e=>setNewEvN(e.target.value)}/></div>
+            <div><Lbl>Rôle</Lbl><Inp placeholder="Ex. : Assistante dentaire" value={newEvR} onChange={e=>setNewEvR(e.target.value)}/></div>
+            <Btn onClick={addEv} style={{background:C.green,padding:"9px 14px"}}>Ajouter</Btn>
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <FL>Secrétaires</FL>
+        {!empList.length&&<div style={{fontSize:13,color:C.textL,padding:"8px",textAlign:"center"}}>Aucune secrétaire.</div>}
+        {empList.map((emp,i)=>{ const ec=Object.values(store.evaluations||{}).filter(e=>e.empId===emp.id).length;
+          return <div key={emp.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:C.cream,borderRadius:8,border:`1px solid ${C.gray}`,marginBottom:6}}>
+            <div style={{width:30,height:30,borderRadius:7,background:empColor(i),display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontWeight:700,fontSize:12,flexShrink:0}}>{emp.name.charAt(0)}</div>
+            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:C.navy}}>{emp.name}</div><div style={{fontSize:11,color:C.textL}}>{ANC_LABELS[emp.anciennete||0]} · {ec} éval.</div></div>
+            <button onClick={()=>rmEmp(emp.id)} style={{padding:"3px 10px",borderRadius:6,border:`1px solid ${C.red}`,background:"transparent",color:C.red,cursor:"pointer",fontSize:11,fontWeight:600}}>Retirer</button>
+          </div>;
+        })}
+        <div style={{background:"rgba(42,127,127,.05)",border:`1.5px solid rgba(42,127,127,.2)`,borderRadius:10,padding:13,marginTop:12}}>
+          <div style={{fontWeight:600,fontSize:12,color:C.teal,marginBottom:9}}>+ Ajouter une secrétaire</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:9,alignItems:"flex-end"}}>
+            <div><Lbl>Nom complet</Lbl><Inp placeholder="Prénom Nom" value={newEmpN} onChange={e=>setNewEmpN(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEmp()}/></div>
+            <Btn onClick={addEmp} style={{padding:"9px 14px"}}>Ajouter</Btn>
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <FL>Export par courriel</FL>
+        <p style={{fontSize:12,color:C.textL,marginBottom:12}}>Envoyez le sommaire complet d'une secrétaire en un clic.</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:9}}>
+          {!empList.length&&<div style={{fontSize:12,color:C.textL}}>Aucune secrétaire.</div>}
+          {empList.map((emp,i)=>{ const evals=Object.values(store.evaluations||{}).filter(e=>e.empId===emp.id).sort((a,b)=>a.dateStart.localeCompare(b.dateStart));
+            return <button key={emp.id} onClick={()=>exportEmail(emp,evals,evMap)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 13px",borderRadius:10,border:`1px solid ${C.gray}`,background:C.white,cursor:"pointer",textAlign:"left",width:"100%"}}>
+              <div style={{width:32,height:32,borderRadius:7,background:empColor(i),display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontWeight:700,fontSize:12,flexShrink:0}}>{emp.name.charAt(0)}</div>
+              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12,color:C.navy}}>{emp.name}</div><div style={{fontSize:11,color:C.textL}}>{evals.length} éval. · ✉️ Exporter</div></div>
+            </button>;
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── APP ROOT ──────────────────────────────────────────────────
+export default function App() {
+  const [store, setStore] = useState(null); // null = loading
+  const [view, setView] = useState("db");
+  const [selEmp, setSelEmp] = useState(null);
+  const [preview, setPreview] = useState(false);
+
+  // Load from persistent storage on mount
+  useEffect(() => {
+    storage.get().then(data => {
+      if (data && data.employees) {
+        if (!data.evaluators || !data.evaluators.length) data.evaluators = JSON.parse(JSON.stringify(DEFAULT_EVALUATORS));
+        setStore(data);
+      } else {
+        setStore(emptyStore());
+      }
+    });
+  }, []);
+
+  // Persist whenever store changes
+  const persist = useCallback(async (newStore) => {
+    setStore(newStore);
+    await storage.set(newStore);
+  }, []);
+
+  if (!store) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:"'Segoe UI',Arial,sans-serif",color:C.textL,background:C.cream,fontSize:16}}>Chargement…</div>;
+
+  const activeStore = preview ? FICTION_STORE : store;
+  const navItems = [{id:"db",label:"🏠 Accueil"},{id:"new",label:"✏️ Nouvelle évaluation"},{id:"hist",label:"📋 Historique"},{id:"evol",label:"📈 Évolution"},{id:"set",label:"⚙️ Paramètres"}];
+
+  const go = v => { setView(v); };
+
+  return (
+    <div style={{fontFamily:"'Segoe UI',Arial,sans-serif",background:C.cream,minHeight:"100vh",color:C.textD}}>
+      <header style={{background:C.navy,padding:"18px 28px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:-50,right:-50,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,.15) 0%,transparent 70%)"}}/>
+        <div style={{maxWidth:1100,margin:"0 auto",position:"relative",zIndex:1}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div>
+              <div style={{display:"inline-flex",alignItems:"center",gap:7,background:"rgba(201,168,76,.15)",border:"1px solid rgba(201,168,76,.3)",borderRadius:100,padding:"3px 12px 3px 7px",marginBottom:8}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:C.gold}}/><span style={{fontSize:10,fontWeight:600,letterSpacing:".08em",textTransform:"uppercase",color:C.goldL}}>Clinique Dentaire St-Étienne</span>
+              </div>
+              <h1 style={{fontSize:"clamp(15px,2.5vw,24px)",fontWeight:700,color:C.white,lineHeight:1.2}}>Échelle Salariale <span style={{color:C.gold}}>&amp; Évaluations</span>{preview&&<span style={{marginLeft:8,fontSize:10,background:"rgba(201,168,76,.3)",color:C.gold,padding:"2px 9px",borderRadius:18,verticalAlign:"middle"}}>APERÇU FICTIF</span>}</h1>
+              <nav style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:8}}>
+                {navItems.map(v=><button key={v.id} onClick={()=>go(v.id)} style={{padding:"5px 11px",borderRadius:7,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",background:view===v.id?"rgba(201,168,76,.22)":"rgba(255,255,255,.07)",color:view===v.id?C.gold:"rgba(255,255,255,.6)",borderBottom:view===v.id?`2px solid ${C.gold}`:"2px solid transparent"}}>{v.label}</button>)}
+              </nav>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
+              <button onClick={()=>{setPreview(p=>!p);if(!preview&&(view==="new"||view==="set"))go("db");}} style={{fontSize:11,padding:"4px 12px",borderRadius:18,border:`1px solid ${preview?"rgba(201,168,76,.5)":"rgba(255,255,255,.18)"}`,background:preview?"rgba(201,168,76,.18)":"transparent",color:preview?C.gold:"rgba(255,255,255,.45)",cursor:"pointer",fontWeight:600}}>
+                {preview?"✕ Quitter l'aperçu fictif":"👁 Aperçu fictif"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main style={{maxWidth:1100,margin:"0 auto",padding:"22px 14px"}}>
+        {preview&&<div style={{background:"rgba(201,168,76,.1)",border:"1px solid rgba(201,168,76,.28)",borderRadius:10,padding:"10px 15px",marginBottom:16,fontSize:13,color:C.gold,fontWeight:500}}>👁 Aperçu fictif — Sophie Beauchemin, Laura Thibodeau, Isabelle Fontaine, Maude Pelletier. Aucune donnée réelle n'est affectée.</div>}
+        {view==="db"&&<><SH title="Tableau de bord" sub="Vue d'ensemble de toutes les secrétaires."/><Dashboard store={activeStore} setView={go} setSelEmp={setSelEmp}/></>}
+        {view==="new"&&(preview?<Card><div style={{textAlign:"center",padding:30,color:C.textL,fontSize:14}}>Désactivez l'aperçu pour créer une vraie évaluation.</div></Card>:<NewEvaluation store={store} persist={persist} setView={go}/>)}
+        {view==="hist"&&<History store={activeStore} selEmp={selEmp} setSelEmp={setSelEmp}/>}
+        {view==="evol"&&<Evolution store={activeStore} selEmp={selEmp} setSelEmp={setSelEmp}/>}
+        {view==="set"&&(preview?<Card><div style={{textAlign:"center",padding:30,color:C.textL,fontSize:14}}>Paramètres désactivés en mode aperçu.</div></Card>:<Settings store={store} persist={persist}/>)}
+      </main>
+    </div>
+  );
+}
