@@ -1793,26 +1793,93 @@ function generateXlsx(pi){
   return XLSX.write(wb,{bookType:'xlsx',type:'array'});
 }
 
+// URL du fichier modèle sur GitHub
+const TEMPLATE_URL = 'https://raw.githubusercontent.com/gestionstetienne-7489/paie-stetienne/main/R%C3%A9partition_v15.xlsx';
+
+// Mapping colonnes lettres → index (0-based)
+const COL = { C:2,D:3,E:4,F:5,G:6,H:7,I:8,J:9,K:10,L:11,M:12,N:13,O:14,P:15,Q:16,R:17,S:18,T:19,U:20,V:21,W:22,X:23 };
+
 async function doSend(){
   closeModal();
   const p=getPeriod(currentPeriodIndex);
   const pStr=`${fmtDate(p.start)} au ${fmtDate(p.end)}`;
   const filename=`Répartition_StEtienne_P${currentPeriodIndex+1}_${p.start.toISOString().slice(0,10)}.xlsx`;
-  showLoadingOverlay('Génération du fichier Excel…');
-  // Charger toutes les données de la période
+
+  showLoadingOverlay('Chargement des données…');
   await loadAllPeriod(currentPeriodIndex);
-  hideLoadingOverlay();
-  try{
-    const xlsxData=generateXlsx(currentPeriodIndex);
-    const blob=new Blob([xlsxData],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href);
-    const subj=encodeURIComponent(`Paie Clinique St-Étienne — Période ${currentPeriodIndex+1} (${pStr})`);
-    const body=encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint la feuille de répartition pour la période du ${pStr}.\n\nFichier : ${filename}\n\nCordialement,\nClinique St-Étienne`);
-    setTimeout(()=>window.open(`mailto:${settings.email}?subject=${subj}&body=${body}`,'_blank'),600);
+
+  showLoadingOverlay('Téléchargement du fichier modèle…');
+  try {
+    // Télécharger le fichier modèle depuis GitHub
+    const resp = await fetch(TEMPLATE_URL);
+    if (!resp.ok) throw new Error('Impossible de télécharger le modèle');
+    const templateBuffer = await resp.arrayBuffer();
+
+    showLoadingOverlay('Insertion des données…');
+
+    // Lire le fichier modèle
+    const wb = XLSX.read(templateBuffer, { type: 'array', cellStyles: true });
+
+    // Insérer les données dans les deux onglets
+    const sheetNames = wb.SheetNames;
+    const wsSemaine = wb.Sheets[sheetNames[0]]; // Semaine du 6 au 17 avril
+    const wsHeures  = wb.Sheets[sheetNames[1]]; // Heures et proportions
+
+    // Construire les données par employée
+    const data = buildXlsxData(currentPeriodIndex);
+
+    // Fonction pour écrire une valeur dans une cellule
+    function writeCell(ws, row, colIdx, value) {
+      const cellRef = XLSX.utils.encode_cell({ r: row - 1, c: colIdx });
+      if (!ws[cellRef]) ws[cellRef] = {};
+      ws[cellRef].v = value;
+      ws[cellRef].t = 'n';
+      if (!ws[cellRef].z) ws[cellRef].z = '#,##0.00';
+    }
+
+    // Insérer dans Semaine
+    Object.entries(data.Semaine).forEach(([rowStr, cols]) => {
+      const row = parseInt(rowStr);
+      Object.entries(cols).forEach(([colIdx, val]) => {
+        if (val && val > 0) writeCell(wsSemaine, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
+      });
+    });
+
+    // Insérer dans Heures
+    Object.entries(data.Heures).forEach(([rowStr, cols]) => {
+      const row = parseInt(rowStr);
+      Object.entries(cols).forEach(([colIdx, val]) => {
+        if (val && val > 0) writeCell(wsHeures, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
+      });
+    });
+
+    // Générer le fichier final
+    const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+
+    hideLoadingOverlay();
+
+    // Télécharger
+    const blob = new Blob([xlsxData], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // Ouvrir courriel
+    const subj = encodeURIComponent(`Paie Clinique St-Étienne — Période ${currentPeriodIndex+1} (${pStr})`);
+    const body = encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint la feuille de répartition pour la période du ${pStr}.\n\nFichier : ${filename}\n\nCordialement,\nClinique St-Étienne`);
+    setTimeout(() => window.open(`mailto:${settings.email}?subject=${subj}&body=${body}`, '_blank'), 600);
+
     await markSent(currentPeriodIndex);
-    toast(`✓ Fichier Excel généré · Courriel préparé pour ${settings.email}`,'ok');
+    toast(`✓ Fichier Répartition généré · Courriel préparé pour ${settings.email}`, 'ok');
     updatePeriodUI(); renderDays(); updateNextSendLabel();
-  }catch(e){console.error(e);toast('Erreur lors de la génération du fichier.','err');}
+
+  } catch(e) {
+    hideLoadingOverlay();
+    console.error(e);
+    toast('Erreur : ' + e.message, 'err');
+  }
 }
 
 function clearPeriod(){
