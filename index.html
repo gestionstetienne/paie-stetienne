@@ -972,11 +972,17 @@ async function markSent(idx) {
   const info = { sentAt:new Date().toISOString(), email:settings.email };
   localStorage.setItem(`sent_${idx}`, JSON.stringify(info));
   try {
-    await sbFetch('periodes_envoyees', {
-      method:'POST', prefer:'resolution=merge-duplicates',
-      body:JSON.stringify({ periode_index:idx, sent_at:info.sentAt, email:info.email, sent_by:currentEmployee })
+    await sbFetch('periodes_envoyees?on_conflict=periode_index', {
+      method:'POST',
+      prefer:'return=minimal,resolution=merge-duplicates',
+      body:JSON.stringify({
+        periode_index:idx,
+        sent_at:info.sentAt,
+        email:info.email,
+        sent_by:currentEmployee
+      })
     });
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('markSent error:',e); }
 }
 
 function setSync(msg, brief=false) {
@@ -1860,10 +1866,33 @@ async function doSend(){
     // Lire le fichier modèle
     const wb = XLSX.read(templateBuffer, { type: 'array', cellStyles: true });
 
-    // Insérer les données dans les deux onglets
-    const sheetNames = wb.SheetNames;
-    const wsSemaine = wb.Sheets[sheetNames[0]]; // Semaine du 6 au 17 avril
-    const wsHeures  = wb.Sheets[sheetNames[1]]; // Heures et proportions
+    // Onglets
+    const wsSemaine = wb.Sheets[wb.SheetNames[0]];
+    const wsHeures  = wb.Sheets[wb.SheetNames[1]];
+
+    // ── EFFACER toutes les cellules de données avant insertion ──
+    // Lignes 6-60, colonnes C(3) à X(24)
+    for (let row = 6; row <= 60; row++) {
+      for (let col = 3; col <= 24; col++) {
+        const ref = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
+        // Garder seulement les formules, effacer les valeurs
+        if (wsSemaine[ref]) {
+          if (wsSemaine[ref].f) {
+            // C'est une formule — garder mais effacer la valeur calculée
+            delete wsSemaine[ref].v;
+          } else {
+            delete wsSemaine[ref];
+          }
+        }
+        if (wsHeures[ref]) {
+          if (wsHeures[ref].f) {
+            delete wsHeures[ref].v;
+          } else {
+            delete wsHeures[ref];
+          }
+        }
+      }
+    }
 
     // Construire les données par employée
     const data = buildXlsxData(currentPeriodIndex);
