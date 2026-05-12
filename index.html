@@ -1,661 +1,237 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-
-// ── PALETTE ───────────────────────────────────────────────────
-const C = {
-  navy:"#1a2744", navyL:"#243360", teal:"#2a7f7f", gold:"#c9a84c", goldL:"#e2c06e",
-  cream:"#f8f5ef", white:"#ffffff", gray:"#e8e3d9",
-  textD:"#1a2744", textM:"#4a5568", textL:"#718096",
-  red:"#c0392b", orange:"#e67e22", green:"#27ae60",
-  redP:"#fdf2f1", orangeP:"#fef9f4", greenP:"#f0faf4",
-};
-const ECOLS = ["#2a7f7f","#c9a84c","#c0392b","#8e44ad","#2980b9","#e67e22","#27ae60","#1a2744"];
-const BASE_RATES = [24,26,27,28,29];
-const ANC_LABELS = ["0–5 ans","5–10 ans","10–15 ans","15–20 ans","20+ ans"];
-const STORE_KEY = "cds_ste_persist_v1";
-
-const DEFAULT_EVALUATORS = [
-  {id:"ev1",name:"Catherine Gagnon",role:"Dentiste"},
-  {id:"ev2",name:"Marie-Michèle Moreau",role:"Dentiste"},
-  {id:"ev3",name:"Marie Côté",role:"Dentiste"},
-  {id:"ev4",name:"Aymeric Bherer",role:"Dentiste"},
-  {id:"ev5",name:"Kelly-Ann Grondin",role:"Dentiste"},
-  {id:"ev6",name:"Philippe Girard",role:"Gestionnaire clinique"},
-  {id:"ev7",name:"Autre",role:""},
-];
-
-const LEVELS_DATA = [
-  {id:1,title:"Accueil & coordination de base",bonus:1,tbd:false,sections:[
-    {title:"Accueil & communication",tasks:["Répondre aux appels entrants et gérer la messagerie vocale","Accueillir les patients à leur arrivée et gérer le registre d'arrivée","Transmettre les messages aux membres de l'équipe","Renseigner les patients sur les services et procédures générales"]},
-    {title:"Gestion des rendez-vous",tasks:["Planifier, confirmer, modifier et annuler les rendez-vous","Effectuer les rappels de rendez-vous (téléphone, texto, courriel)","Gérer les listes d'attente et les remplacements de dernière minute","Optimiser l'horaire pour maximiser l'utilisation des salles"]},
-    {title:"Dossiers, facturation & soumissions",tasks:["Ouvrir, mettre à jour et archiver les dossiers patients","Saisir les actes et les notes au dossier après la consultation","Produire et remettre les factures aux patients","Encaisser les paiements (comptant, carte, chèque)","Soumettre les réclamations aux assurances privées par voie électronique","Soumettre les factures RAMQ (enfants -10 ans, carnet de réclamation)","Soumettre les réclamations RCSD (Régime canadien de soins dentaires)"]},
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Évaluations — Clinique Dentaire St-Étienne</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f8f5ef;color:#1a2744;min-height:100vh}
+button{font-family:inherit}input,select,textarea{font-family:inherit;outline:none}textarea{resize:vertical}
+.hidden{display:none!important}
+header{background:#1a2744;padding:18px 28px}
+.hi{max-width:1100px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:7px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);border-radius:100px;padding:3px 12px 3px 7px;margin-bottom:8px}
+.bdot{width:6px;height:6px;border-radius:50%;background:#c9a84c}.btxt{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#e2c06e}
+h1{font-size:clamp(15px,2.5vw,24px);font-weight:700;color:#fff}h1 em{color:#c9a84c;font-style:normal}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.nb{padding:5px 11px;border-radius:7px;border:none;font-size:11px;font-weight:600;background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);border-bottom:2px solid transparent;cursor:pointer}
+.nb.on{background:rgba(201,168,76,.22);color:#c9a84c;border-bottom-color:#c9a84c}
+#pvBtn{font-size:11px;padding:4px 12px;border-radius:18px;border:1px solid rgba(255,255,255,.18);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-weight:600;margin-top:5px}
+#pvBtn.on{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.18);color:#c9a84c}
+main{max-width:1100px;margin:0 auto;padding:22px 14px}
+.pv-bar{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.28);border-radius:10px;padding:10px 15px;margin-bottom:16px;font-size:13px;color:#c9a84c;font-weight:500}
+.card{background:#fff;border-radius:14px;box-shadow:0 4px 18px rgba(26,39,68,.08);padding:20px;margin-bottom:16px;border:1px solid #e8e3d9}
+.sh{font-size:18px;font-weight:700;color:#1a2744;margin-bottom:3px}.ss{font-size:12px;color:#718096;margin-bottom:16px}
+.fl{font-size:14px;font-weight:700;color:#1a2744;margin-bottom:11px}
+.lb{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#4a5568;margin-bottom:4px}
+.inp{width:100%;padding:9px 11px;border:1.5px solid #e8e3d9;border-radius:7px;font-size:13px;color:#1a2744;background:#f8f5ef}
+.inp:focus{border-color:#2a7f7f;background:#fff}
+.fg{display:flex;flex-direction:column;gap:4px}
+.ga{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:11px}
+.gc{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:flex-end}
+@media(max-width:560px){.g2,.g3{grid-template-columns:1fr}}
+.btn{padding:9px 18px;border-radius:8px;border:none;background:#2a7f7f;color:#fff;font-weight:700;font-size:12px;cursor:pointer}
+.btn-g{background:#27ae60}.btn-c{background:#f8f5ef;color:#4a5568;border:1.5px solid #e8e3d9}
+.btn-sm{padding:5px 9px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer}
+.btn-ol{background:transparent;border:1px solid;cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px}
+.pil{padding:4px 11px;border-radius:15px;border:1.5px solid;font-size:11px;font-weight:600;cursor:pointer}
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:480px){.sg{grid-template-columns:repeat(2,1fr)}}
+.st{border-radius:10px;padding:11px}.sn{font-size:24px;font-weight:700;line-height:1}
+.sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.pb{height:5px;border-radius:3px;background:#e8e3d9;overflow:hidden;display:flex;margin-top:9px}
+.ps{height:100%;transition:width .3s}
+.ec{background:#fff;border-radius:14px;box-shadow:0 3px 14px rgba(26,39,68,.08);border:1px solid #e8e3d9;overflow:hidden}
+.ech{padding:13px 15px;display:flex;align-items:center;gap:10px}
+.av{width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.ecb{padding:11px 15px}.eac{display:flex;gap:5px;margin-top:8px}
+.ls{display:flex;border:1.5px solid #e8e3d9;border-radius:9px;overflow:hidden;margin-bottom:11px}
+.lb2{flex:1;padding:9px 4px;text-align:center;cursor:pointer;border-right:1px solid #e8e3d9;background:#f8f5ef;transition:background .15s}
+.lb2:last-child{border-right:none}.lb2.la{background:#2a7f7f}.lb2.la5{background:#1a2744}.lb2.li{background:rgba(42,127,127,.1)}
+.ln{font-size:15px;font-weight:700;color:#1a2744}.lb2.la .ln,.lb2.la5 .ln{color:#fff}.lb2.li .ln{color:#2a7f7f}
+.lr{font-size:9px;font-weight:700;color:#2a7f7f;margin-top:2px}.lb2.la .lr{color:rgba(255,255,255,.9)}.lb2.la5 .lr{color:#c9a84c}
+.rp{background:linear-gradient(135deg,#1a2744,#243360);border-radius:10px;padding:13px 17px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.rb{font-size:28px;font-weight:700;color:#c9a84c;line-height:1}
+.pi{display:flex;align-items:center;gap:9px;padding:9px 13px;background:rgba(42,127,127,.06);border:1px solid rgba(42,127,127,.19);border-radius:9px;margin-bottom:12px;font-size:13px}
+.pi.err{background:#fdf2f1;border-color:rgba(192,57,43,.19);color:#c0392b}
+.lb3{border:1.5px solid #e8e3d9;border-radius:11px;overflow:hidden;margin-bottom:7px}
+.lh{display:flex;align-items:center;gap:9px;padding:11px 14px;cursor:pointer;border-bottom:1px solid transparent}
+.lbdg{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.lbd{padding:12px 14px;display:none}.lbd.op{display:block}
+.slb{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid rgba(42,127,127,.14)}
+.tr2{border-radius:7px;border:1.5px solid transparent;overflow:hidden;margin-bottom:3px}
+.ti{display:flex;align-items:center;gap:7px;padding:6px 8px;flex-wrap:wrap}
+.tt{flex:1;font-size:12px;color:#4a5568;line-height:1.4;min-width:140px}
+.ab{display:flex;gap:3px;flex-shrink:0}
+.apb{padding:3px 7px;border-radius:14px;font-size:9px;font-weight:600;cursor:pointer;border:1.5px solid;background:transparent;white-space:nowrap}
+.apb[data-a="at"]{border-color:#c0392b;color:#c0392b}.apb[data-a="ok"]{border-color:#e67e22;color:#e67e22}.apb[data-a="ex"]{border-color:#27ae60;color:#27ae60}
+.apb.sel[data-a="at"]{background:#c0392b;color:#fff}.apb.sel[data-a="ok"]{background:#e67e22;color:#fff}.apb.sel[data-a="ex"]{background:#27ae60;color:#fff}
+.cz{padding:5px 8px 8px;background:#fdf2f1;border-top:1px solid rgba(192,57,43,.11);display:none}
+.cz.sh2{display:block}.ci{width:100%;padding:5px 8px;border:1.5px solid rgba(192,57,43,.22);border-radius:5px;font-size:11px;color:#1a2744;background:#fff;min-height:42px}
+.ehd{display:flex;align-items:center;gap:10px;padding:12px 15px;cursor:pointer}
+.edl{padding:15px 19px;display:none}.edl.op{display:block}
+.pl{display:inline-flex;align-items:center;padding:2px 6px;border-radius:14px;font-size:10px;font-weight:700;border:1px solid}
+.at2{background:rgba(192,57,43,.12);color:#c0392b;border-color:rgba(192,57,43,.28)}
+.ok2{background:rgba(230,126,34,.12);color:#e67e22;border-color:rgba(230,126,34,.28)}
+.ex2{background:rgba(39,174,96,.12);color:#27ae60;border-color:rgba(39,174,96,.28)}
+.stg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.scc{background:#fff;border-radius:11px;padding:13px;border:1px solid #e8e3d9;box-shadow:0 2px 8px rgba(26,39,68,.05)}
+.scv{font-size:19px;font-weight:700;line-height:1}.scl{font-size:9px;color:#718096;margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
+.tl{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:9px;border:1px solid #e8e3d9;flex-wrap:wrap;margin-bottom:6px}
+.tld{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0}
+.evr,.empr{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8f5ef;border-radius:8px;border:1px solid #e8e3d9;margin-bottom:6px}
+.ab2{border-radius:10px;padding:13px}.abg{background:#f0faf4;border:1.5px solid rgba(39,174,96,.19)}.abt{background:rgba(42,127,127,.05);border:1.5px solid rgba(42,127,127,.19)}
+.inh{font-size:10px;color:#718096;font-style:italic;padding:4px 8px;background:rgba(42,127,127,.04);border-radius:5px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="hi">
+    <div>
+      <div class="badge"><div class="bdot"></div><span class="btxt">Clinique Dentaire St-Étienne</span></div>
+      <h1>Échelle Salariale <em>&amp; Évaluations</em></h1>
+      <nav id="nav">
+        <button class="nb on" data-v="db">🏠 Accueil</button>
+        <button class="nb" data-v="new">✏️ Nouvelle évaluation</button>
+        <button class="nb" data-v="hist">📋 Historique</button>
+        <button class="nb" data-v="evol">📈 Évolution</button>
+        <button class="nb" data-v="set">⚙️ Paramètres</button>
+      </nav>
+    </div>
+    <button id="pvBtn">👁 Aperçu fictif</button>
+  </div>
+</header>
+<main id="app"></main>
+<script>
+var ECOLS=["#2a7f7f","#c9a84c","#c0392b","#8e44ad","#2980b9","#e67e22","#27ae60","#1a2744"];
+var BASE=[24,26,27,28,29];
+var ANCS=["0–5 ans","5–10 ans","10–15 ans","15–20 ans","20+ ans"];
+var STORE_KEY="cds_ste_v3";
+var DEF_EVS=[{id:"ev1",name:"Catherine Gagnon",role:"Dentiste"},{id:"ev2",name:"Marie-Michèle Moreau",role:"Dentiste"},{id:"ev3",name:"Marie Côté",role:"Dentiste"},{id:"ev4",name:"Aymeric Bherer",role:"Dentiste"},{id:"ev5",name:"Kelly-Ann Grondin",role:"Dentiste"},{id:"ev6",name:"Philippe Girard",role:"Gestionnaire clinique"},{id:"ev7",name:"Autre",role:""}];
+var LEVELS=[
+  {id:1,title:"Accueil & coordination de base",bonus:1,sections:[
+    {t:"Accueil & communication",tasks:["Répondre aux appels entrants et gérer la messagerie vocale","Accueillir les patients à leur arrivée et gérer le registre d'arrivée","Transmettre les messages aux membres de l'équipe","Renseigner les patients sur les services et procédures générales"]},
+    {t:"Gestion des rendez-vous",tasks:["Planifier, confirmer, modifier et annuler les rendez-vous","Effectuer les rappels de rendez-vous (téléphone, texto, courriel)","Gérer les listes d'attente et les remplacements de dernière minute","Optimiser l'horaire pour maximiser l'utilisation des salles"]},
+    {t:"Dossiers, facturation & soumissions",tasks:["Ouvrir, mettre à jour et archiver les dossiers patients","Saisir les actes et les notes au dossier après la consultation","Produire et remettre les factures aux patients","Encaisser les paiements (comptant, carte, chèque)","Soumettre les réclamations aux assurances privées par voie électronique","Soumettre les factures RAMQ (enfants -10 ans, carnet de réclamation)","Soumettre les réclamations RCSD (Régime canadien de soins dentaires)"]}
   ]},
-  {id:2,title:"Clôture financière quotidienne & dépôts",bonus:2,tbd:false,sections:[
-    {title:"Clôture de journée",tasks:["Effectuer la réconciliation de caisse en fin de journée","Préparer le rapport de fermeture quotidienne (production, encaissements)","Identifier et signaler les écarts de caisse","Assurer le suivi des paiements partiels et soldes de comptes patients"]},
-    {title:"Dépôts bancaires",tasks:["Préparer et effectuer les dépôts bancaires","Vérifier la concordance entre les dépôts et les rapports de caisse","Conserver et classer les bordereaux de dépôt"]},
-    {title:"Suivi des assurances privées",tasks:["Assurer le suivi des réclamations refusées ou en attente","Communiquer avec les assureurs pour les demandes de précision","Mettre à jour les informations d'assurance dans les dossiers patients"]},
+  {id:2,title:"Clôture financière quotidienne & dépôts",bonus:2,sections:[
+    {t:"Clôture de journée",tasks:["Effectuer la réconciliation de caisse en fin de journée","Préparer le rapport de fermeture quotidienne (production, encaissements)","Identifier et signaler les écarts de caisse","Assurer le suivi des paiements partiels et soldes de comptes patients"]},
+    {t:"Dépôts bancaires",tasks:["Préparer et effectuer les dépôts bancaires","Vérifier la concordance entre les dépôts et les rapports de caisse","Conserver et classer les bordereaux de dépôt"]},
+    {t:"Suivi des assurances privées",tasks:["Assurer le suivi des réclamations refusées ou en attente","Communiquer avec les assureurs pour les demandes de précision","Mettre à jour les informations d'assurance dans les dossiers patients"]}
   ]},
-  {id:3,title:"Gestion financière & comptes à recevoir",bonus:3,tbd:false,sections:[
-    {title:"Comptes à recevoir",tasks:["Assurer le suivi rigoureux des comptes à recevoir","Relancer les patients pour les soldes impayés (lettres, appels)","Gérer les arrangements de paiement et les plans échelonnés","Préparer les rapports de comptes à recevoir"]},
-    {title:"Paiements non utilisés & remboursements",tasks:["Gérer les paiements non utilisés et les crédits en compte patient","Effectuer les remboursements aux patients (trop-perçus, annulations)","Tenir le registre des transactions en suspens","Réconcilier les crédits dans le logiciel de gestion dentaire"]},
+  {id:3,title:"Gestion financière & comptes à recevoir",bonus:3,sections:[
+    {t:"Comptes à recevoir",tasks:["Assurer le suivi rigoureux des comptes à recevoir","Relancer les patients pour les soldes impayés (lettres, appels)","Gérer les arrangements de paiement et les plans échelonnés","Préparer les rapports de comptes à recevoir"]},
+    {t:"Paiements non utilisés & remboursements",tasks:["Gérer les paiements non utilisés et les crédits en compte patient","Effectuer les remboursements aux patients (trop-perçus, annulations)","Tenir le registre des transactions en suspens","Réconcilier les crédits dans le logiciel de gestion dentaire"]}
   ]},
-  {id:4,title:"Coordination avancée & programmes publics",bonus:4,tbd:false,sections:[
-    {title:"Suivi RAMQ & RCSD",tasks:["Assurer le suivi des factures RAMQ refusées, en attente ou en révision","Gérer les demandes de pièces justificatives de la RAMQ","Assurer le suivi des réclamations RCSD et coordonner les préautorisations","Effectuer la saisie comptable liée aux programmes publics","Se tenir à jour sur les modifications aux programmes RAMQ et RCSD"]},
-    {title:"Orthodontie & plans de traitement",tasks:["Gérer les dossiers d'orthodontie : contrats, échéanciers, suivi pluriannuel","Coordonner les plans de traitement multi-étapes avec le dentiste","Assurer le suivi des plans de traitement et relancer les patients","Préparer et présenter les estimés de coût aux patients","Gérer les soumissions d'assurance pour traitements spécialisés"]},
-    {title:"Gestion avancée de l'horaire",tasks:["Effectuer les modifications au manuel horaire (gabarits, configurations)","Optimiser les blocs de production selon les objectifs de la clinique","Coordonner les horaires de plusieurs praticiens"]},
+  {id:4,title:"Coordination avancée & programmes publics",bonus:4,sections:[
+    {t:"Suivi RAMQ & RCSD",tasks:["Assurer le suivi des factures RAMQ refusées, en attente ou en révision","Gérer les demandes de pièces justificatives de la RAMQ","Assurer le suivi des réclamations RCSD et coordonner les préautorisations","Effectuer la saisie comptable liée aux programmes publics","Se tenir à jour sur les modifications aux programmes RAMQ et RCSD"]},
+    {t:"Orthodontie & plans de traitement",tasks:["Gérer les dossiers d'orthodontie : contrats, échéanciers, suivi pluriannuel","Coordonner les plans de traitement multi-étapes avec le dentiste","Assurer le suivi des plans de traitement et relancer les patients","Préparer et présenter les estimés de coût aux patients","Gérer les soumissions d'assurance pour traitements spécialisés"]},
+    {t:"Gestion avancée de l'horaire",tasks:["Effectuer les modifications au manuel horaire (gabarits, configurations)","Optimiser les blocs de production selon les objectifs de la clinique","Coordonner les horaires de plusieurs praticiens"]}
   ]},
   {id:5,title:"Gestion & coordination de clinique",bonus:null,tbd:true,sections:[
-    {title:"Gestion des opérations",tasks:["Superviser le bon fonctionnement quotidien de la clinique","Élaborer, mettre à jour et faire respecter les procédures internes","Assurer le respect des normes d'hygiène, sécurité et confidentialité","Coordonner les fournisseurs de services (équipements, TI, entretien)","Transmettre les rapports de facturation au dentiste responsable"]},
-    {title:"Ressources humaines",tasks:["Participer au recrutement, à la sélection et à l'intégration du personnel","Gérer les horaires de travail et planifier les remplacements","Assurer le suivi des évaluations de rendement et des objectifs","Gérer les communications internes et faciliter la résolution de conflits","Veiller à la formation continue et à l'intégration des nouvelles procédures"]},
-    {title:"Gestion comptable & financière",tasks:["Préparer les sommaires financiers hebdomadaires et mensuels","Produire les rapports de production et d'analyse de performance","Faire le lien avec le comptable externe","Superviser la facturation, les dépôts et les comptes à recevoir","Participer à la préparation des budgets et au suivi des dépenses"]},
-    {title:"Marketing, achats & projets spéciaux",tasks:["Gérer les réseaux sociaux et le site web de la clinique","Coordonner les campagnes de fidélisation et de communication","Gérer les commandes de fournitures et négocier avec les fournisseurs","Coordonner les projets de développement ou de transformation","Piloter l'implantation de nouveaux logiciels ou procédures"]},
-  ]},
+    {t:"Gestion des opérations",tasks:["Superviser le bon fonctionnement quotidien de la clinique","Élaborer, mettre à jour et faire respecter les procédures internes","Assurer le respect des normes d'hygiène, sécurité et confidentialité","Coordonner les fournisseurs de services (équipements, TI, entretien)","Transmettre les rapports de facturation au dentiste responsable"]},
+    {t:"Ressources humaines",tasks:["Participer au recrutement, à la sélection et à l'intégration du personnel","Gérer les horaires de travail et planifier les remplacements","Assurer le suivi des évaluations de rendement et des objectifs","Gérer les communications internes et faciliter la résolution de conflits","Veiller à la formation continue et à l'intégration des nouvelles procédures"]},
+    {t:"Gestion comptable & financière",tasks:["Préparer les sommaires financiers hebdomadaires et mensuels","Produire les rapports de production et d'analyse de performance","Faire le lien avec le comptable externe","Superviser la facturation, les dépôts et les comptes à recevoir","Participer à la préparation des budgets et au suivi des dépenses"]},
+    {t:"Marketing, achats & projets spéciaux",tasks:["Gérer les réseaux sociaux et le site web de la clinique","Coordonner les campagnes de fidélisation et de communication","Gérer les commandes de fournitures et négocier avec les fournisseurs","Coordonner les projets de développement ou de transformation","Piloter l'implantation de nouveaux logiciels ou procédures"]}
+  ]}
 ];
-
-// ── HELPERS ───────────────────────────────────────────────────
-const todayISO = () => new Date().toISOString().slice(0,10);
-const fmtD = d => { if(!d) return "—"; const dt=new Date(d+"T00:00:00"); const days=["dim","lun","mar","mer","jeu","ven","sam"]; const mo=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."]; return `${days[dt.getDay()]} ${dt.getDate()} ${mo[dt.getMonth()]} ${dt.getFullYear()}`; };
-const fmtS = d => { if(!d) return "—"; const dt=new Date(d+"T00:00:00"); return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`; };
-const scoreOf = tasks => { const v=Object.values(tasks); const ev=v.filter(t=>t.appr); return {total:ev.length, at:ev.filter(t=>t.appr==="at").length, ok:ev.filter(t=>t.appr==="ok").length, ex:ev.filter(t=>t.appr==="ex").length}; };
-const pct = (n,t) => t>0 ? Math.round(n/t*100) : 0;
-const overlaps = (s1,e1,s2,e2) => s1<=e2 && e1>=s2;
-const tkey = (lid,st,i) => `${lid}_${st.replace(/[^a-z0-9]/gi,"_")}_${i}`;
-const buildBlankTasks = () => { const t={}; LEVELS_DATA.forEach(l=>l.sections.forEach(s=>s.tasks.forEach((task,i)=>{ t[tkey(l.id,s.title,i)]={appr:null,comment:"",lvlId:l.id,label:task}; }))); return t; };
-const empColor = (i) => ECOLS[i % ECOLS.length];
-
-// ── PERSISTENT STORAGE ────────────────────────────────────────
-// Uses window.storage (Claude artifact persistent storage) with localStorage as fallback
-const storage = {
-  async get() {
-    // Try window.storage first (Claude artifact persistent storage)
-    if (typeof window !== "undefined" && window.storage) {
-      try {
-        const r = await window.storage.get(STORE_KEY);
-        if (r) return JSON.parse(r.value);
-      } catch(e) {}
-    }
-    // Fallback to localStorage
-    try {
-      const r = localStorage.getItem(STORE_KEY);
-      if (r) return JSON.parse(r);
-    } catch(e) {}
-    return null;
-  },
-  async set(data) {
-    const str = JSON.stringify(data);
-    // Try window.storage first
-    if (typeof window !== "undefined" && window.storage) {
-      try { await window.storage.set(STORE_KEY, str); } catch(e) {}
-    }
-    // Also write to localStorage as backup
-    try { localStorage.setItem(STORE_KEY, str); } catch(e) {}
+function fmtD(d){if(!d)return"—";var dt=new Date(d+"T00:00:00");var days=["dim","lun","mar","mer","jeu","ven","sam"];var mo=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];return days[dt.getDay()]+" "+dt.getDate()+" "+mo[dt.getMonth()]+" "+dt.getFullYear();}
+function fmtS(d){if(!d)return"—";var dt=new Date(d+"T00:00:00");return("0"+dt.getDate()).slice(-2)+"/"+("0"+(dt.getMonth()+1)).slice(-2)+"/"+dt.getFullYear();}
+function today(){return new Date().toISOString().slice(0,10);}
+function sc(tasks){var v=Object.values(tasks),ev=v.filter(function(t){return t.a;});return{n:ev.length,at:ev.filter(function(t){return t.a==="at";}).length,ok:ev.filter(function(t){return t.a==="ok";}).length,ex:ev.filter(function(t){return t.a==="ex";}).length};}
+function pct(n,t){return t>0?Math.round(n/t*100):0;}
+function over(s1,e1,s2,e2){return s1<=e2&&e1>=s2;}
+function tkey(lid,st,i){return lid+"_"+st.replace(/[^a-z0-9]/gi,"_")+"_"+i;}
+function blankTasks(){var t={};LEVELS.forEach(function(l){l.sections.forEach(function(s){s.tasks.forEach(function(task,i){t[tkey(l.id,s.t,i)]={a:null,c:"",lid:l.id,lbl:task};});});});return t;}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function col(i){return ECOLS[i%ECOLS.length];}
+// Storage - localStorage with sessionStorage backup
+function loadStore(){
+  try{
+    var r=localStorage.getItem(STORE_KEY);
+    if(r){var d=JSON.parse(r);if(!d.evs||!d.evs.length)d.evs=JSON.parse(JSON.stringify(DEF_EVS));return d;}
+  }catch(e){}
+  return{emp:{},evl:{},evs:JSON.parse(JSON.stringify(DEF_EVS))};
+}
+function saveStore(){
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(S));}catch(e){
+    try{sessionStorage.setItem(STORE_KEY,JSON.stringify(S));}catch(e2){}
   }
-};
-
-const emptyStore = () => ({
-  employees: {},
-  evaluations: {},
-  evaluators: JSON.parse(JSON.stringify(DEFAULT_EVALUATORS)),
-});
-
-// ── FICTIONAL PREVIEW DATA ────────────────────────────────────
-function mkFT(ei) {
-  const profiles = [[5,60,35],[30,55,15],[2,40,58],[10,55,35]];
-  const p = profiles[ei] || profiles[0];
-  const tasks = {}; let gi = 0;
-  LEVELS_DATA.forEach(l => l.sections.forEach(s => s.tasks.forEach((task,i) => {
-    const k = tkey(l.id,s.title,i);
-    const skip = l.id > ei+2 && gi%3===0;
-    let appr = null;
-    if (!skip) { const r=(gi*37+ei*17)%100; appr=r<p[0]?"at":r<p[0]+p[1]?"ok":"ex"; }
-    tasks[k] = {appr, comment: appr==="at"?"À préciser lors de la rétroaction":"", lvlId:l.id, label:task};
-    gi++;
-  })));
-  return tasks;
 }
-const FICTION_STORE = {
-  employees: {f1:{id:"f1",name:"Sophie Beauchemin",anciennete:1},f2:{id:"f2",name:"Laura Thibodeau",anciennete:0},f3:{id:"f3",name:"Isabelle Fontaine",anciennete:3},f4:{id:"f4",name:"Maude Pelletier",anciennete:2}},
-  evaluations: {
-    e1:{id:"e1",empId:"f1",dateStart:"2024-01-08",dateEnd:"2024-03-29",evaluateur:"ev6",anciennete:1,niveauLevel:3,tasks:mkFT(0)},
-    e2:{id:"e2",empId:"f1",dateStart:"2025-01-06",dateEnd:"2025-03-28",evaluateur:"ev6",anciennete:1,niveauLevel:3,tasks:mkFT(0)},
-    e3:{id:"e3",empId:"f2",dateStart:"2024-06-03",dateEnd:"2024-08-30",evaluateur:"ev1",anciennete:0,niveauLevel:1,tasks:mkFT(1)},
-    e4:{id:"e4",empId:"f3",dateStart:"2024-03-04",dateEnd:"2024-06-28",evaluateur:"ev6",anciennete:3,niveauLevel:4,tasks:mkFT(2)},
-    e5:{id:"e5",empId:"f3",dateStart:"2025-02-03",dateEnd:"2025-04-30",evaluateur:"ev6",anciennete:3,niveauLevel:4,tasks:mkFT(2)},
-    e6:{id:"e6",empId:"f4",dateStart:"2024-09-02",dateEnd:"2024-11-29",evaluateur:"ev2",anciennete:2,niveauLevel:2,tasks:mkFT(3)},
-  },
-  evaluators: DEFAULT_EVALUATORS,
-};
-
-// ── EMAIL EXPORT ──────────────────────────────────────────────
-function exportEmail(emp, evals, evMap) {
-  const lines = [`CLINIQUE DENTAIRE ST-ÉTIENNE`, `Sommaire — ${emp.name}`, `Généré le ${fmtD(todayISO())}`, "─".repeat(50), ""];
-  evals.forEach((ev,i) => {
-    const s = scoreOf(ev.tasks); const evN = evMap[ev.evaluateur]||ev.evaluateur||"—";
-    lines.push(`ÉVALUATION ${i+1} — ${fmtS(ev.dateStart)} au ${fmtS(ev.dateEnd)}`);
-    lines.push(`Évaluateur : ${evN} · Niveau ${ev.niveauLevel} · ${ANC_LABELS[ev.anciennete||0]}`);
-    lines.push(`Résumé : ${s.total} tâches | ${s.at} à travailler | ${s.ok} satisfait | ${s.ex} surpasse`, "");
-    const at = Object.values(ev.tasks).filter(t=>t.appr==="at");
-    if(at.length){lines.push("  POINTS À TRAVAILLER");at.forEach(t=>{lines.push(`  • ${t.label}`);if(t.comment)lines.push(`    → ${t.comment}`);});lines.push("");}
-    const ex = Object.values(ev.tasks).filter(t=>t.appr==="ex");
-    if(ex.length){lines.push("  SURPASSE LES ATTENTES");ex.forEach(t=>lines.push(`  ★ ${t.label}`));lines.push("");}
-    lines.push("─".repeat(40),"");
-  });
-  window.location.href = `mailto:?subject=${encodeURIComponent(`Évaluation — ${emp.name} — CDS St-Étienne`)}&body=${encodeURIComponent(lines.join("\n"))}`;
+// Fictional
+function mkFT(ei){var profiles=[[5,60,35],[30,55,15],[2,40,58],[10,55,35]];var p=profiles[ei]||profiles[0];var tasks={};var gi=0;LEVELS.forEach(function(l){l.sections.forEach(function(s){s.tasks.forEach(function(task,i){var k=tkey(l.id,s.t,i);var skip=l.id>ei+2&&gi%3===0;var ap=null;if(!skip){var r=(gi*37+ei*17)%100;ap=r<p[0]?"at":r<p[0]+p[1]?"ok":"ex";}tasks[k]={a:ap,c:ap==="at"?"À préciser lors de la rétroaction":"",lid:l.id,lbl:task};gi++;});});});return tasks;}
+var FICTION={emp:{f1:{id:"f1",name:"Sophie Beauchemin",anc:1},f2:{id:"f2",name:"Laura Thibodeau",anc:0},f3:{id:"f3",name:"Isabelle Fontaine",anc:3},f4:{id:"f4",name:"Maude Pelletier",anc:2}},evl:{e1:{id:"e1",eid:"f1",ds:"2024-01-08",de:"2024-03-29",ev:"ev6",anc:1,niv:3,tasks:mkFT(0)},e2:{id:"e2",eid:"f1",ds:"2025-01-06",de:"2025-03-28",ev:"ev6",anc:1,niv:3,tasks:mkFT(0)},e3:{id:"e3",eid:"f2",ds:"2024-06-03",de:"2024-08-30",ev:"ev1",anc:0,niv:1,tasks:mkFT(1)},e4:{id:"e4",eid:"f3",ds:"2024-03-04",de:"2024-06-28",ev:"ev6",anc:3,niv:4,tasks:mkFT(2)},e5:{id:"e5",eid:"f3",ds:"2025-02-03",de:"2025-04-30",ev:"ev6",anc:3,niv:4,tasks:mkFT(2)},e6:{id:"e6",eid:"f4",ds:"2024-09-02",de:"2024-11-29",ev:"ev2",anc:2,niv:2,tasks:mkFT(3)}},evs:DEF_EVS};
+var S=loadStore(),pv=false,view="db",selEmp=null;
+var NE={tasks:blankTasks(),niv:0,anc:0,openLvls:{1:true}};
+function DS(){return pv?FICTION:S;}
+function evMap(){var m={};(DS().evs||[]).forEach(function(e){m[e.id]=e.name;});return m;}
+function empArr(){return Object.values(DS().emp);}
+function evalsByEmp(eid){return Object.values(DS().evl).filter(function(e){return e.eid===eid;}).sort(function(a,b){return a.ds.localeCompare(b.ds);});}
+function doMail(empId){var emp=DS().emp[empId];var evals=evalsByEmp(empId);var vm=evMap();var lines=["CLINIQUE DENTAIRE ST-ÉTIENNE","Sommaire — "+emp.name,"","─".repeat(50),""];evals.forEach(function(ev,i){var s=sc(ev.tasks);var evN=vm[ev.ev]||ev.ev||"—";lines.push("ÉVALUATION "+(i+1)+" — "+fmtS(ev.ds)+" au "+fmtS(ev.de));lines.push("Évaluateur : "+evN+" · Niveau "+ev.niv+" · "+ANCS[ev.anc||0]);lines.push("Résumé : "+s.n+" tâches | "+s.at+" à travailler | "+s.ok+" satisfait | "+s.ex+" surpasse","");var at=Object.values(ev.tasks).filter(function(t){return t.a==="at";});if(at.length){lines.push("  POINTS À TRAVAILLER");at.forEach(function(t){lines.push("  • "+t.lbl);if(t.c)lines.push("    → "+t.c);});lines.push("");}var ex=Object.values(ev.tasks).filter(function(t){return t.a==="ex";});if(ex.length){lines.push("  SURPASSE LES ATTENTES");ex.forEach(function(t){lines.push("  ★ "+t.lbl);});lines.push("");}lines.push("─".repeat(40),"");});window.location.href="mailto:?subject="+encodeURIComponent("Évaluation — "+emp.name+" — CDS St-Étienne")+"&body="+encodeURIComponent(lines.join("\n"));}
+function pills(s){var h="";if(s.at>0)h+='<span class="pl at2">'+s.at+' à trav.</span> ';if(s.ok>0)h+='<span class="pl ok2">'+s.ok+' satisf.</span> ';if(s.ex>0)h+='<span class="pl ex2">'+s.ex+' surp.</span>';if(!s.n)h+='<span style="font-size:11px;color:#718096">—</span>';return h;}
+function prog(s){if(!s.n)return"";return'<div class="pb"><div class="ps" style="width:'+pct(s.at,s.n)+'%;background:#c0392b"></div><div class="ps" style="width:'+pct(s.ok,s.n)+'%;background:#e67e22"></div><div class="ps" style="width:'+pct(s.ex,s.n)+'%;background:#27ae60"></div></div>';}
+function sGrid(s){return'<div class="sg"><div class="st" style="background:#1a2744"><div class="sn" style="color:#c9a84c">'+s.n+'</div><div class="sl" style="color:rgba(255,255,255,.5)">Évaluées</div></div><div class="st" style="background:rgba(192,57,43,.14)"><div class="sn" style="color:#c0392b">'+s.at+'</div><div class="sl" style="color:#c0392b">À travailler</div></div><div class="st" style="background:rgba(230,126,34,.14)"><div class="sn" style="color:#e67e22">'+s.ok+'</div><div class="sl" style="color:#e67e22">Satisfait</div></div><div class="st" style="background:rgba(39,174,96,.14)"><div class="sn" style="color:#27ae60">'+s.ex+'</div><div class="sl" style="color:#27ae60">Surpasse</div></div></div>';}
+function lvlSel(cur){var btns=[{id:0,n:"Aucun",r:"base"}];LEVELS.forEach(function(l){btns.push({id:l.id,n:""+l.id,r:l.tbd?"À déterm.":"+"+l.bonus+"$/h"});});return'<div class="ls">'+btns.map(function(b){var cls="lb2"+(cur===b.id?" la"+(b.id===5?"5":""):b.id>0&&b.id<cur?" li":"");return'<div class="'+cls+'" data-lv="'+b.id+'"><div class="ln">'+b.n+'</div><div class="lr">'+b.r+'</div></div>';}).join("")+'</div>';}
+function rateP(anc,niv){var base=BASE[anc],bonus=niv>0&&niv<5?LEVELS[niv-1].bonus:0,total=base+bonus;return'<div class="rp"><div style="display:flex;gap:16px;flex-wrap:wrap">'+[["Base",base.toFixed(2)+" $/h"],["Prime",niv===5?"À déterm.":"+"+bonus.toFixed(2)+" $/h"],["Total",niv===5?base.toFixed(2)+" + nég.":total.toFixed(2)+" $/h"]].map(function(x){return'<div><div style="font-size:9px;color:rgba(255,255,255,.4)">'+x[0]+'</div><div style="font-weight:700;color:#c9a84c;font-size:13px">'+x[1]+'</div></div>';}).join("")+'</div><div style="text-align:right"><div style="font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em">Taux</div><div class="rb">'+(niv===5?"—":total.toFixed(2))+'</div><div style="font-size:10px;color:rgba(255,255,255,.3)">'+(niv===5?"prime nég.":"$/heure")+'</div></div></div>';}
+function taskGrid(tasks){var h="";LEVELS.forEach(function(l){var lt=Object.entries(tasks).filter(function(e){return e[1].lid===l.id;});var ev=lt.filter(function(e){return e[1].a;}).length;var lc=l.id===5?"#1a2744":"#2a7f7f";var op=NE.openLvls[l.id];h+='<div class="lb3"><div class="lh" data-lhid="'+l.id+'" style="background:'+(op?(l.id===5?"rgba(26,39,68,.05)":"rgba(42,127,127,.05)"):"#f8f5ef")+'"><div class="lbdg" style="background:'+lc+'">'+l.id+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px;color:#1a2744">Niveau '+l.id+' — '+l.title+'</div><div style="font-size:10px;color:#718096;margin-top:1px">'+(l.id<5?"Inclut niveaux inférieurs · ":"")+ev+"/"+lt.length+' évaluées</div></div><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:15px;background:'+(l.tbd?"#1a2744":"#2a7f7f")+';color:'+(l.tbd?"#c9a84c":"#fff")+'">'+(l.tbd?"Prime à déterm.":"+"+l.bonus+" $/h")+'</span><span style="font-size:11px;color:#718096;margin-left:5px;display:inline-block;transform:'+(op?"rotate(180deg)":"none")+'">▾</span></div><div class="lbd '+(op?"op":"")+'" id="lb_'+l.id+'">';if(l.id>1)h+='<div class="inh">✓ Inclut toutes les tâches des niveaux 1 à '+(l.id-1)+'</div>';l.sections.forEach(function(sec){h+='<div class="slb" style="color:'+lc+'">'+sec.t+'</div>';sec.tasks.forEach(function(task,i){var k=tkey(l.id,sec.t,i);var st=tasks[k]||{a:null,c:""};var bg=st.a==="at"?"#fdf2f1":st.a==="ok"?"#fef9f4":st.a==="ex"?"#f0faf4":"#fff";var bc=st.a==="at"?"rgba(192,57,43,.25)":st.a==="ok"?"rgba(230,126,34,.2)":st.a==="ex"?"rgba(39,174,96,.2)":"transparent";h+='<div class="tr2" id="tr_'+k+'" style="border-color:'+bc+'"><div class="ti" style="background:'+bg+'"><span class="tt">'+esc(task)+'</span><div class="ab">'+['at','ok','ex'].map(function(a){return'<button class="apb'+(st.a===a?" sel":"")+'" data-a="'+a+'" data-k="'+k+'" style="opacity:'+(st.a&&st.a!==a?"0.4":"1")+'">'+(a==="at"?"À travailler":a==="ok"?"Satisfait":"Surpasse")+'</button>';}).join("")+'</div></div><div class="cz '+(st.a==="at"?"sh2":"")+'" id="cz_'+k+'"><div style="font-size:9px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">📝 Plan d\'action</div><textarea class="ci" data-k="'+k+'" placeholder="Points à améliorer, objectifs…">'+esc(st.c||"")+'</textarea></div></div>';});});h+='</div></div>';});return h;}
+function evalDetail(ev,evN){var tasks=ev.tasks||{};var h='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;background:#f8f5ef;border-radius:7px;margin-bottom:13px;font-size:12px"><span><b>Période :</b> '+fmtD(ev.ds)+' → '+fmtD(ev.de)+'</span><span><b>Évaluateur :</b> '+esc(evN)+'</span><span><b>Ancienneté :</b> '+ANCS[ev.anc||0]+'</span><span><b>Niveau :</b> '+(ev.niv===5?"5 (prime à déterm.)":ev.niv===0?"Aucun":"Niveau "+ev.niv)+'</span></div>';LEVELS.forEach(function(l){var lt=Object.entries(tasks).filter(function(e){return e[1].lid===l.id&&e[1].a;});if(!lt.length)return;h+='<div style="margin-bottom:12px"><div style="font-weight:700;font-size:12px;color:'+(l.id===5?"#1a2744":"#2a7f7f")+';border-bottom:1px solid #e8e3d9;padding-bottom:3px;margin-bottom:6px">Niveau '+l.id+' — '+l.title+'</div>';lt.forEach(function(e){var t=e[1];var isAt=t.a==="at";var isOk=t.a==="ok";var bg=isAt?"#fdf2f1":isOk?"#fef9f4":"#f0faf4";var tc=isAt?"#c0392b":isOk?"#e67e22":"#27ae60";var tl=isAt?"À travailler":isOk?"Satisfait":"Surpasse";h+='<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 7px;border-radius:6px;margin-bottom:3px;background:'+bg+'"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:15px;background:'+tc+';color:#fff;flex-shrink:0;margin-top:2px">'+tl+'</span><div><div style="font-size:12px;color:#1a2744">'+esc(t.lbl)+'</div>'+(isAt&&t.c?'<div style="font-size:11px;color:#c0392b;margin-top:2px;font-style:italic">📝 '+esc(t.c)+'</div>':"")+'</div></div>';});h+='</div>';});return h;}
+function svgLine(data){if(!data||data.length<2)return'<p style="color:#718096;font-size:12px;text-align:center;padding:18px">Au moins 2 évaluations nécessaires.</p>';var W=520,H=190,PL=38,PT=14,PR=14,PB=38,cW=W-PL-PR,cH=H-PT-PB;var series=[{k:"ex",c:"#27ae60",n:"Surpasse %"},{k:"ok",c:"#e67e22",n:"Satisfait %"},{k:"at",c:"#c0392b",n:"À travailler %"}];var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;display:block;margin:0 auto">';[0,25,50,75,100].forEach(function(v){var y=PT+cH*(1-v/100);s+='<line x1="'+PL+'" y1="'+y+'" x2="'+(PL+cW)+'" y2="'+y+'" stroke="#e8e3d9" stroke-width="1"/><text x="'+(PL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#718096">'+v+'%</text>';});data.forEach(function(d,i){var x=PL+i*(cW/(data.length-1));s+='<text x="'+x+'" y="'+(H-6)+'" text-anchor="middle" font-size="9" fill="#718096">'+d.dt+'</text>';});series.forEach(function(sr){var pts=data.map(function(d,i){var x=PL+i*(cW/(data.length-1));var y=PT+cH*(1-d[sr.k]/100);return x+","+y;});s+='<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+sr.c+'" stroke-width="2.5" stroke-linejoin="round"/>';data.forEach(function(d,i){var x=PL+i*(cW/(data.length-1));var y=PT+cH*(1-d[sr.k]/100);s+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="'+sr.c+'"/>';});});var lx=PL;series.forEach(function(sr){s+='<circle cx="'+(lx+4)+'" cy="'+(H-22)+'" r="4" fill="'+sr.c+'"/><text x="'+(lx+11)+'" y="'+(H-18)+'" font-size="9" fill="#4a5568">'+sr.n+'</text>';lx+=82;});return s+'</svg>';}
+function svgRadar(data){var W=240,H=240,CX=120,CY=120,R=85,n=data.length;var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;display:block;margin:0 auto">';[25,50,75,100].forEach(function(v){var pts=data.map(function(_,i){var a=(i/n)*2*Math.PI-Math.PI/2;var r=R*v/100;return(CX+r*Math.cos(a))+","+(CY+r*Math.sin(a));});s+='<polygon points="'+pts.join(" ")+'" fill="none" stroke="#e8e3d9" stroke-width="1"/>';});data.forEach(function(_,i){var a=(i/n)*2*Math.PI-Math.PI/2;s+='<line x1="'+CX+'" y1="'+CY+'" x2="'+(CX+R*Math.cos(a))+'" y2="'+(CY+R*Math.sin(a))+'" stroke="#e8e3d9" stroke-width="1"/>';});var dpts=data.map(function(d,i){var a=(i/n)*2*Math.PI-Math.PI/2;var r=R*d.score/100;return(CX+r*Math.cos(a))+","+(CY+r*Math.sin(a));});s+='<polygon points="'+dpts.join(" ")+'" fill="rgba(42,127,127,.2)" stroke="#2a7f7f" stroke-width="2"/>';data.forEach(function(d,i){var a=(i/n)*2*Math.PI-Math.PI/2;var lx=CX+(R+17)*Math.cos(a);var ly=CY+(R+17)*Math.sin(a);s+='<text x="'+lx+'" y="'+(ly+4)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#4a5568">'+d.lv+'</text>';});return s+'</svg>';}
+// VIEWS
+function vDB(){var emps=empArr();var vm=evMap();var h='<div class="sh">Tableau de bord</div><div class="ss">Vue d\'ensemble de toutes les secrétaires.</div>';if(!emps.length){return h+'<div class="card" style="text-align:center;padding:48px"><div style="font-size:42px;margin-bottom:12px">📋</div><div style="font-weight:600;font-size:16px;color:#4a5568;margin-bottom:12px">Aucune secrétaire enregistrée</div><button class="btn" data-go="new">✏️ Créer la première évaluation</button></div>';}h+='<div class="gc">';emps.forEach(function(emp,i){var evs=evalsByEmp(emp.id);var last=evs[evs.length-1];var s=last?sc(last.tasks):null;var c=col(i);var evN=last?vm[last.ev]||last.ev:"";h+='<div class="ec"><div class="ech" style="background:'+c+'"><div class="av">'+esc(emp.name.charAt(0))+'</div><div style="flex:1"><div style="font-weight:700;font-size:14px;color:#fff">'+esc(emp.name)+'</div><div style="font-size:11px;color:rgba(255,255,255,.65)">'+evs.length+' éval. · '+ANCS[emp.anc||0]+'</div></div></div><div class="ecb">';if(last&&s){h+='<div style="font-size:11px;color:#718096;margin-bottom:4px">'+fmtS(last.ds)+" → "+fmtS(last.de)+(evN?" · "+esc(evN):"")+'</div><div style="display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap">'+pills(s)+'</div>'+prog(s);}else h+='<div style="font-size:12px;color:#718096">Aucune évaluation.</div>';h+='<div class="eac"><button class="btn-sm" data-go="hist" data-emp="'+emp.id+'" style="flex:1;background:#f8f5ef;color:#4a5568;border:1px solid #e8e3d9">📋 Historique</button><button class="btn-sm" data-go="evol" data-emp="'+emp.id+'" style="flex:1;background:'+c+';color:#fff">📈 Évolution</button>'+(evs.length?'<button class="btn-sm" data-mail="'+emp.id+'" style="background:#1a2744;color:#e2c06e">✉️</button>':'')+'</div></div></div>';});return h+'</div>';}
+function vNew(){var emps=empArr();var evs=DS().evs||[];return'<div class="sh">Nouvelle évaluation</div><div class="ss">Définissez la période, l\'évaluateur et complétez la grille.</div><div class="card"><div class="fl">1. Identification &amp; période</div><div class="ga" style="margin-bottom:12px"><div class="fg"><div class="lb">Secrétaire évaluée</div>'+(emps.length?'<select class="inp" id="nES" style="margin-bottom:7px"><option value="">— Nouvelle secrétaire —</option>'+emps.map(function(e){return'<option value="'+e.id+'">'+esc(e.name)+'</option>';}).join("")+'</select>':'')+'<input class="inp" id="nEN" placeholder="Prénom et nom"></div><div class="fg"><div class="lb">Évalué(e) par</div><select class="inp" id="nEV">'+evs.map(function(e){return'<option value="'+e.id+'">'+esc(e.name)+(e.role?" — "+esc(e.role):"")+'</option>';}).join("")+'</select><input class="inp hidden" id="nEVO" placeholder="Nom de l\'évaluateur" style="margin-top:7px"></div><div class="fg"><div class="lb">Début de la période</div><input type="date" class="inp" id="nDS" value="'+today()+'"></div><div class="fg"><div class="lb">Fin de la période</div><input type="date" class="inp" id="nDE" value="'+today()+'"></div><div class="fg"><div class="lb">Années d\'expérience</div><select class="inp" id="nANC">'+ANCS.map(function(l,i){return'<option value="'+i+'">'+l+'</option>';}).join("")+'</select></div></div><div id="nPI"></div><div class="lb">Niveau de responsabilité</div><div id="nLS">'+lvlSel(0)+'</div><div id="nRP">'+rateP(0,0)+'</div></div><div class="card"><div class="fl">2. Résumé en temps réel</div><div id="nSG">'+sGrid({n:0,at:0,ok:0,ex:0})+'</div><div id="nPB"></div></div><div class="card"><div class="fl">3. Grille d\'évaluation</div><div style="display:flex;gap:9px;flex-wrap:wrap;padding:7px 11px;background:#f8f5ef;border-radius:7px;border:1px solid #e8e3d9;margin-bottom:14px;align-items:center"><span style="font-size:11px;font-weight:700;color:#4a5568">Appréciation :</span>'+[["#c0392b","À travailler"],["#e67e22","Satisfait les critères"],["#27ae60","Surpasse les attentes"],["#e8e3d9","Non évalué"]].map(function(x){return'<span style="display:flex;align-items:center;gap:4px;font-size:11px"><span style="width:7px;height:7px;border-radius:50%;background:'+x[0]+';flex-shrink:0"></span><span style="color:'+(x[0]==="#e8e3d9"?"#718096":x[0])+'">'+x[1]+'</span></span>';}).join("")+'</div><div id="nTG">'+taskGrid(NE.tasks)+'</div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-bottom:36px"><button class="btn btn-c" data-go="db">Annuler</button><button class="btn" id="nSAVE">💾 Enregistrer</button></div>';}
+function vHist(){var emps=empArr();var vm=evMap();var filtered=selEmp?Object.values(DS().evl).filter(function(e){return e.eid===selEmp;}).sort(function(a,b){return b.ds.localeCompare(a.ds);}):Object.values(DS().evl).sort(function(a,b){return b.ds.localeCompare(a.ds);});var h='<div class="sh">Historique des évaluations</div><div class="ss">Consultez toutes les évaluations par secrétaire.</div><div class="card"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;font-weight:700;color:#4a5568">Filtrer :</span><button class="pil" data-emp="null" style="background:'+(selEmp?"#f8f5ef":"#2a7f7f")+';color:'+(selEmp?"#4a5568":"#fff")+';border-color:'+(selEmp?"#e8e3d9":"#2a7f7f")+'">Toutes</button>'+emps.map(function(e,i){return'<button class="pil" data-emp="'+e.id+'" style="background:'+(selEmp===e.id?col(i):"#f8f5ef")+';color:'+(selEmp===e.id?"#fff":"#4a5568")+';border-color:'+(selEmp===e.id?col(i):"#e8e3d9")+'">'+esc(e.name)+'</button>';}).join("")+'</div></div>';if(!filtered.length)return h+'<div class="card" style="text-align:center;padding:26px;color:#718096;font-size:13px">Aucune évaluation.</div>';filtered.forEach(function(ev){var emp=DS().emp[ev.eid];var s=sc(ev.tasks);var empI=emps.findIndex(function(e){return e.id===ev.eid;});var c=col(empI);var evN=vm[ev.ev]||ev.ev||"—";h+='<div class="card" style="padding:0;overflow:hidden"><div class="ehd" data-evid="'+ev.id+'"><div style="width:34px;height:34px;border-radius:8px;background:'+c+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">'+(emp?esc(emp.name.charAt(0)):"?")+'</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;color:#1a2744">'+(emp?esc(emp.name):"—")+'</div><div style="font-size:11px;color:#718096;margin-top:2px"><span style="background:'+c+'22;color:'+c+';padding:1px 7px;border-radius:18px;font-weight:600;margin-right:5px">📅 '+fmtS(ev.ds)+' → '+fmtS(ev.de)+'</span>Par '+esc(evN)+' · Niveau '+ev.niv+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap">'+pills(s)+'</div><span style="font-size:13px;color:#718096;margin-left:7px">▾</span></div><div class="edl" id="ed_'+ev.id+'" style="padding:0 16px 14px">'+evalDetail(ev,evN)+'</div></div>';});return h;}
+function vEvol(){var emps=empArr();var ae=selEmp?DS().emp[selEmp]:null;var evs=ae?evalsByEmp(ae.id):[];var h='<div class="sh">Évolution</div><div class="ss">Progression de chaque secrétaire au fil des évaluations.</div><div class="card"><div class="lb">Sélectionner une secrétaire</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+emps.map(function(e,i){return'<button class="pil" data-emp="'+e.id+'" style="font-size:12px;padding:7px 15px;background:'+(selEmp===e.id?col(i):"#f8f5ef")+';color:'+(selEmp===e.id?"#fff":"#4a5568")+';border-color:'+(selEmp===e.id?col(i):"#e8e3d9")+';font-weight:600">'+esc(e.name)+'</button>';}).join("")+'</div></div>';if(!ae)return h+'<div class="card" style="text-align:center;padding:26px;color:#718096;font-size:13px">Sélectionnez une secrétaire.</div>';if(!evs.length)return h+'<div class="card" style="text-align:center;padding:26px;color:#718096;font-size:13px">Aucune évaluation pour '+esc(ae.name)+'.</div>';var f=sc(evs[0].tasks);var l=sc(evs[evs.length-1].tasks);var diff=pct(l.ex,l.n)-pct(f.ex,f.n);var ei=emps.findIndex(function(e){return e.id===ae.id;});h+='<div class="stg"><div class="scc"><div class="scv" style="color:'+col(ei)+'">'+evs.length+'</div><div class="scl">Évaluations</div></div><div class="scc"><div class="scv" style="color:#4a5568">'+evs[0].ds.slice(0,4)+'</div><div class="scl">Première</div></div><div class="scc"><div class="scv" style="color:#4a5568">'+evs[evs.length-1].ds.slice(0,4)+'</div><div class="scl">Dernière</div></div>'+(evs.length>=2?'<div class="scc"><div class="scv" style="color:#27ae60">'+(diff>=0?"+":"")+diff+'%</div><div class="scl">Évol. surpasse</div></div>':"")+' </div>';var cData=evs.map(function(ev){var s=sc(ev.tasks);return{dt:fmtS(ev.ds),ex:pct(s.ex,s.n),ok:pct(s.ok,s.n),at:pct(s.at,s.n)};});h+='<div class="card"><div class="fl">Évolution des appréciations</div>'+svgLine(cData)+'</div>';var lastEv=evs[evs.length-1];var rad=LEVELS.map(function(lv){var lt=Object.values(lastEv.tasks).filter(function(t){return t.lid===lv.id&&t.a;});var ex=lt.filter(function(t){return t.a==="ex";}).length;var ok=lt.filter(function(t){return t.a==="ok";}).length;var tot=lt.length;return{lv:"N"+lv.id,score:tot>0?Math.round((ex*3+ok*2)/tot/3*100):0};});if(rad.some(function(d){return d.score>0;}))h+='<div class="card"><div class="fl">Profil par niveau — dernière évaluation</div>'+svgRadar(rad)+'</div>';h+='<div class="card"><div class="fl">Chronologie des périodes</div>';evs.forEach(function(ev,i){var s=sc(ev.tasks);var isL=i===evs.length-1;h+='<div class="tl" style="background:'+(isL?"rgba(42,127,127,.06)":"#f8f5ef")+';border-color:'+(isL?"#2a7f7f":"#e8e3d9")+'"><div class="tld" style="background:'+(isL?"#2a7f7f":"#aaa")+'">'+ev.ds.slice(0,4)+'</div><div style="flex:1"><div style="font-weight:600;font-size:12px;color:#1a2744">'+fmtS(ev.ds)+' → '+fmtS(ev.de)+'</div><div style="font-size:10px;color:#718096">Niveau '+ev.niv+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap">'+pills(s)+'</div>'+(isL?'<span style="font-size:9px;background:#2a7f7f;color:#fff;padding:2px 5px;border-radius:18px">Dernière</span>':'')+'</div>';});return h+'</div>';}
+function vSet(){var emps=empArr();var vm=evMap();var h='<div class="sh">Paramètres</div><div class="ss">Gérez les évaluateurs, les secrétaires et les exports.</div><div class="card"><div class="fl">Évaluateurs</div>';(S.evs||[]).forEach(function(ev){var isDef=["ev1","ev2","ev3","ev4","ev5","ev6","ev7"].includes(ev.id);h+='<div class="evr"><div style="flex:1"><div style="font-weight:600;font-size:13px;color:#1a2744">'+esc(ev.name)+'</div>'+(ev.role?'<div style="font-size:11px;color:#718096">'+esc(ev.role)+'</div>':"")+'</div>'+(isDef?'<span style="font-size:9px;color:#718096;background:#e8e3d9;padding:2px 8px;border-radius:18px">Par défaut</span>':'<button class="btn-ol" data-rmev="'+ev.id+'" style="color:#c0392b;border-color:#c0392b">Retirer</button>')+'</div>';});h+='<div class="ab2 abg" style="margin-top:12px"><div style="font-weight:600;font-size:12px;color:#27ae60;margin-bottom:9px">+ Ajouter un évaluateur</div><div class="g3"><div class="fg"><div class="lb">Nom</div><input class="inp" id="sEN" placeholder="Prénom Nom"></div><div class="fg"><div class="lb">Rôle</div><input class="inp" id="sER" placeholder="Ex. : Assistante dentaire"></div><button class="btn btn-g" id="sAddEv">Ajouter</button></div></div></div><div class="card"><div class="fl">Secrétaires</div>';if(!emps.length)h+='<div style="font-size:13px;color:#718096;padding:8px;text-align:center">Aucune secrétaire.</div>';emps.forEach(function(emp,i){var ec=Object.values(S.evl||{}).filter(function(e){return e.eid===emp.id;}).length;h+='<div class="empr"><div style="width:30px;height:30px;border-radius:7px;background:'+col(i)+';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0">'+esc(emp.name.charAt(0))+'</div><div style="flex:1"><div style="font-weight:600;font-size:13px;color:#1a2744">'+esc(emp.name)+'</div><div style="font-size:11px;color:#718096">'+ANCS[emp.anc||0]+' · '+ec+' éval.</div></div><button class="btn-ol" data-rmemp="'+emp.id+'" style="color:#c0392b;border-color:#c0392b">Retirer</button></div>';});h+='<div class="ab2 abt" style="margin-top:12px"><div style="font-weight:600;font-size:12px;color:#2a7f7f;margin-bottom:9px">+ Ajouter une secrétaire</div><div class="g2" style="align-items:flex-end"><div class="fg"><div class="lb">Nom complet</div><input class="inp" id="sEmpN" placeholder="Prénom Nom"></div><button class="btn" id="sAddEmp">Ajouter</button></div></div></div><div class="card"><div class="fl">Export par courriel</div><p style="font-size:12px;color:#718096;margin-bottom:12px">Envoyez le sommaire complet d\'une secrétaire en un clic.</p><div class="gc">';emps.forEach(function(emp,i){var ec=Object.values(S.evl||{}).filter(function(e){return e.eid===emp.id;}).length;h+='<button data-mail="'+emp.id+'" style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:10px;border:1px solid #e8e3d9;background:#fff;cursor:pointer;text-align:left;width:100%"><div style="width:32px;height:32px;border-radius:7px;background:'+col(i)+';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0">'+esc(emp.name.charAt(0))+'</div><div style="flex:1"><div style="font-weight:600;font-size:12px;color:#1a2744">'+esc(emp.name)+'</div><div style="font-size:11px;color:#718096">'+ec+' éval. · ✉️ Exporter</div></div></button>';});h+='</div></div>';return h;}
+function render(v){
+  if(v)view=v;
+  document.querySelectorAll(".nb").forEach(function(b){b.classList.toggle("on",b.dataset.v===view);});
+  var app=document.getElementById("app");
+  var pvH=pv?'<div class="pv-bar">👁 Aperçu fictif — Sophie Beauchemin, Laura Thibodeau, Isabelle Fontaine, Maude Pelletier. Aucune donnée réelle n\'est affectée.</div>':"";
+  if(view==="db")app.innerHTML=pvH+vDB();
+  else if(view==="new")app.innerHTML=pvH+(pv?'<div class="card" style="text-align:center;padding:30px;color:#718096">Désactivez l\'aperçu pour créer une vraie évaluation.</div>':vNew());
+  else if(view==="hist")app.innerHTML=pvH+vHist();
+  else if(view==="evol")app.innerHTML=pvH+vEvol();
+  else if(view==="set")app.innerHTML=pvH+(pv?'<div class="card" style="text-align:center;padding:30px;color:#718096">Paramètres désactivés en mode aperçu.</div>':vSet());
+  bind();
 }
-
-// ── SVG CHARTS ────────────────────────────────────────────────
-function LineChart({data}) {
-  if (!data || data.length < 2) return <p style={{color:C.textL,fontSize:12,textAlign:"center",padding:18}}>Au moins 2 évaluations nécessaires pour afficher le graphique.</p>;
-  const W=520,H=190,PL=38,PT=14,PR=14,PB=38,cW=W-PL-PR,cH=H-PT-PB;
-  const series=[{k:"ex",c:C.green,n:"Surpasse %"},{k:"ok",c:C.orange,n:"Satisfait %"},{k:"at",c:C.red,n:"À travailler %"}];
-  const x = (i) => PL + i*(cW/(data.length-1));
-  const y = (v) => PT + cH*(1-v/100);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block",margin:"0 auto"}}>
-      {[0,25,50,75,100].map(v=><g key={v}><line x1={PL} y1={y(v)} x2={PL+cW} y2={y(v)} stroke={C.gray} strokeWidth="1"/><text x={PL-4} y={y(v)+4} textAnchor="end" fontSize="9" fill={C.textL}>{v}%</text></g>)}
-      {data.map((d,i)=><text key={i} x={x(i)} y={H-6} textAnchor="middle" fontSize="9" fill={C.textL}>{d.dt}</text>)}
-      {series.map(sr=>(
-        <g key={sr.k}>
-          <polyline points={data.map((d,i)=>`${x(i)},${y(d[sr.k])}`).join(" ")} fill="none" stroke={sr.c} strokeWidth="2.5" strokeLinejoin="round"/>
-          {data.map((d,i)=><circle key={i} cx={x(i)} cy={y(d[sr.k])} r="4" fill={sr.c}/>)}
-        </g>
-      ))}
-      {series.map((sr,i)=>(
-        <g key={sr.k}>
-          <circle cx={PL+i*82+4} cy={H-22} r="4" fill={sr.c}/>
-          <text x={PL+i*82+11} y={H-18} fontSize="9" fill={C.textM}>{sr.n}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function RadarChart({data}) {
-  if (!data || !data.some(d=>d.score>0)) return null;
-  const W=240,H=240,CX=120,CY=120,R=85,n=data.length;
-  const pt = (i,r) => { const a=(i/n)*2*Math.PI-Math.PI/2; return `${CX+r*Math.cos(a)},${CY+r*Math.sin(a)}`; };
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block",margin:"0 auto"}}>
-      {[25,50,75,100].map(v=><polygon key={v} points={data.map((_,i)=>pt(i,R*v/100)).join(" ")} fill="none" stroke={C.gray} strokeWidth="1"/>)}
-      {data.map((_,i)=><line key={i} x1={CX} y1={CY} x2={pt(i,R).split(",")[0]} y2={pt(i,R).split(",")[1]} stroke={C.gray} strokeWidth="1"/>)}
-      <polygon points={data.map((d,i)=>pt(i,R*d.score/100)).join(" ")} fill="rgba(42,127,127,.2)" stroke={C.teal} strokeWidth="2"/>
-      {data.map((d,i)=>{ const a=(i/n)*2*Math.PI-Math.PI/2; const lx=CX+(R+17)*Math.cos(a); const ly=CY+(R+17)*Math.sin(a); return <text key={i} x={lx} y={ly+4} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.textM}>{d.lv}</text>; })}
-    </svg>
-  );
-}
-
-// ── SMALL COMPONENTS ──────────────────────────────────────────
-const Card = ({children,style={}}) => <div style={{background:C.white,borderRadius:14,boxShadow:"0 4px 18px rgba(26,39,68,.09)",padding:20,marginBottom:16,border:`1px solid ${C.gray}`,...style}}>{children}</div>;
-const SH = ({title,sub}) => <div style={{marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:C.navy,marginBottom:3}}>{title}</div><div style={{fontSize:12,color:C.textL}}>{sub}</div></div>;
-const FL = ({children}) => <div style={{fontSize:14,fontWeight:700,color:C.navy,marginBottom:11}}>{children}</div>;
-const Lbl = ({children}) => <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:C.textM,marginBottom:4}}>{children}</div>;
-const Btn = ({children,onClick,style={}}) => <button onClick={onClick} style={{padding:"9px 18px",borderRadius:8,border:"none",background:C.teal,color:C.white,fontWeight:700,fontSize:12,cursor:"pointer",...style}}>{children}</button>;
-const Pill = ({n,color,label}) => <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:15,background:`${color}20`,color,border:`1px solid ${color}44`}}>{n} {label}</span>;
-const Inp = ({style={},...props}) => <input {...props} style={{width:"100%",padding:"9px 11px",border:`1.5px solid ${C.gray}`,borderRadius:7,fontSize:13,color:C.textD,background:C.cream,outline:"none",...style}}/>;
-const Sel = ({children,...props}) => <select {...props} style={{width:"100%",padding:"9px 11px",border:`1.5px solid ${C.gray}`,borderRadius:7,fontSize:13,color:C.textD,background:C.cream,outline:"none"}}>{children}</select>;
-const ScoreTile = ({n,label,color,dark=false}) => <div style={{borderRadius:10,padding:"11px",background:dark?color:`${color}18`,border:`1.5px solid ${dark?"transparent":`${color}33`}`}}><div style={{fontSize:24,fontWeight:700,color:dark?C.gold:color,lineHeight:1}}>{n}</div><div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:dark?"rgba(255,255,255,.5)":color,marginTop:3}}>{label}</div></div>;
-
-function ProgBar({s}) {
-  if (!s.total) return null;
-  return <div style={{height:5,borderRadius:3,background:C.gray,overflow:"hidden",display:"flex",marginTop:8}}>
-    {s.at>0&&<div style={{height:"100%",background:C.red,width:pct(s.at,s.total)+"%"}}/>}
-    {s.ok>0&&<div style={{height:"100%",background:C.orange,width:pct(s.ok,s.total)+"%"}}/>}
-    {s.ex>0&&<div style={{height:"100%",background:C.green,width:pct(s.ex,s.total)+"%"}}/>}
-  </div>;
-}
-
-function Pills({s}) {
-  if (!s.total) return <span style={{fontSize:11,color:C.textL}}>—</span>;
-  return <>{s.at>0&&<Pill n={s.at} color={C.red} label="à trav."/>} {s.ok>0&&<Pill n={s.ok} color={C.orange} label="satisf."/>} {s.ex>0&&<Pill n={s.ex} color={C.green} label="surp."/>}</>;
-}
-
-// ── LEVEL BLOCK ───────────────────────────────────────────────
-function LevelBlock({level:l, tasks, setAppr, setComment, open, onToggle}) {
-  const lt = Object.entries(tasks).filter(([,v])=>v.lvlId===l.id);
-  const ev = lt.filter(([,v])=>v.appr).length;
-  const lc = l.id===5 ? C.navy : C.teal;
-  return (
-    <div style={{border:`1.5px solid ${l.id===5?"rgba(26,39,68,.2)":C.gray}`,borderRadius:11,overflow:"hidden",marginBottom:7}}>
-      <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:9,padding:"11px 14px",cursor:"pointer",background:open?(l.id===5?"rgba(26,39,68,.05)":"rgba(42,127,127,.05)"):C.cream,borderBottom:open?`1px solid ${C.gray}`:"none"}}>
-        <div style={{width:30,height:30,borderRadius:7,background:lc,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{l.id}</div>
-        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:C.navy}}>Niveau {l.id} — {l.title}</div><div style={{fontSize:10,color:C.textL,marginTop:1}}>{l.id<5?"Inclut niveaux inférieurs · ":""}{ev}/{lt.length} évaluées</div></div>
-        <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:14,background:l.tbd?C.navy:C.teal,color:l.tbd?C.gold:C.white}}>{l.tbd?"Prime à déterm.":"+"+l.bonus+" $/h"}</span>
-        <span style={{fontSize:11,color:C.textL,transition:"transform .2s",display:"inline-block",transform:open?"rotate(180deg)":"none"}}>▾</span>
-      </div>
-      {open && (
-        <div style={{padding:"12px 14px"}}>
-          {l.id>1 && <div style={{fontSize:10,color:C.textL,fontStyle:"italic",padding:"4px 8px",background:"rgba(42,127,127,.04)",borderRadius:5,marginBottom:10}}>✓ Inclut toutes les tâches des niveaux 1 à {l.id-1}</div>}
-          {l.sections.map(sec=>(
-            <div key={sec.title} style={{marginBottom:12}}>
-              <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:lc,marginBottom:5,paddingBottom:3,borderBottom:`1px solid ${l.id===5?"rgba(26,39,68,.12)":"rgba(42,127,127,.14)"}`}}>{sec.title}</div>
-              {sec.tasks.map((task,i)=>{
-                const k = tkey(l.id,sec.title,i);
-                const st = tasks[k]||{appr:null,comment:""};
-                const bg = st.appr==="at"?C.redP:st.appr==="ok"?C.orangeP:st.appr==="ex"?C.greenP:C.white;
-                const bc = st.appr==="at"?"rgba(192,57,43,.25)":st.appr==="ok"?"rgba(230,126,34,.2)":st.appr==="ex"?"rgba(39,174,96,.2)":"transparent";
-                return (
-                  <div key={k} style={{borderRadius:7,border:`1.5px solid ${bc}`,overflow:"hidden",marginBottom:3}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,padding:"6px 8px",background:bg,flexWrap:"wrap"}}>
-                      <span style={{flex:1,fontSize:12,color:C.textM,lineHeight:1.4}}>{task}</span>
-                      <div style={{display:"flex",gap:3,flexShrink:0}}>
-                        {[["at","À travailler",C.red],["ok","Satisfait",C.orange],["ex","Surpasse",C.green]].map(([a,lbl,c])=>(
-                          <button key={a} onClick={()=>setAppr(k,a)} style={{padding:"3px 7px",borderRadius:13,fontSize:9,fontWeight:600,cursor:"pointer",border:`1.5px solid ${c}`,background:st.appr===a?c:"transparent",color:st.appr===a?C.white:c,opacity:st.appr&&st.appr!==a?.4:1,whiteSpace:"nowrap"}}>{lbl}</button>
-                        ))}
-                      </div>
-                    </div>
-                    {st.appr==="at" && (
-                      <div style={{padding:"5px 8px 8px",background:C.redP,borderTop:"1px solid rgba(192,57,43,.11)"}}>
-                        <div style={{fontSize:9,fontWeight:700,color:C.red,textTransform:"uppercase",letterSpacing:".06em",marginBottom:3}}>📝 Plan d'action</div>
-                        <textarea value={st.comment||""} onChange={e=>setComment(k,e.target.value)} placeholder="Points à améliorer, objectifs, ressources…" style={{width:"100%",padding:"5px 8px",border:`1.5px solid rgba(192,57,43,.22)`,borderRadius:5,fontSize:11,color:C.textD,background:C.white,minHeight:40,resize:"vertical",outline:"none"}}/>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── LEVEL SELECTOR ────────────────────────────────────────────
-function LevelSelector({current, onChange}) {
-  const btns = [{id:0,n:"Aucun",r:"base"}, ...LEVELS_DATA.map(l=>({id:l.id,n:`${l.id}`,r:l.tbd?"À déterm.":"+"+l.bonus+"$/h"}))];
-  return (
-    <div style={{display:"flex",border:`1.5px solid ${C.gray}`,borderRadius:9,overflow:"hidden",marginBottom:11}}>
-      {btns.map(b=>{
-        const isA=current===b.id, isI=b.id>0&&b.id<current;
-        return <div key={b.id} onClick={()=>onChange(b.id)} style={{flex:1,padding:"9px 3px",textAlign:"center",cursor:"pointer",background:isA?(b.id===5?C.navy:C.teal):isI?"rgba(42,127,127,.1)":C.cream,borderRight:`1px solid ${C.gray}`,transition:"background .15s"}}>
-          <div style={{fontSize:b.id===0?10:15,fontWeight:700,color:isA?C.white:isI?C.teal:C.navy}}>{b.n}</div>
-          <div style={{fontSize:9,fontWeight:700,color:isA?(b.id===5?C.gold:"rgba(255,255,255,.9)"):C.teal,marginTop:2}}>{b.r}</div>
-        </div>;
-      })}
-    </div>
-  );
-}
-
-function RatePanel({anc, niv}) {
-  const base=BASE_RATES[anc], bonus=niv>0&&niv<5?LEVELS_DATA[niv-1].bonus:0, total=base+bonus;
-  return (
-    <div style={{background:`linear-gradient(135deg,${C.navy},${C.navyL})`,borderRadius:10,padding:"13px 17px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-        {[["Base",`${base.toFixed(2)} $/h`],["Prime",niv===5?"À déterm.":"+"+bonus.toFixed(2)+" $/h"],["Total",niv===5?`${base.toFixed(2)} + nég.`:total.toFixed(2)+" $/h"]].map(([l,v])=>(
-          <div key={l}><div style={{fontSize:9,color:"rgba(255,255,255,.4)"}}>{l}</div><div style={{fontWeight:700,color:C.gold,fontSize:13}}>{v}</div></div>
-        ))}
-      </div>
-      <div style={{textAlign:"right"}}><div style={{fontSize:9,color:"rgba(255,255,255,.35)",textTransform:"uppercase",letterSpacing:".1em"}}>Taux</div><div style={{fontSize:28,fontWeight:700,color:C.gold,lineHeight:1}}>{niv===5?"—":total.toFixed(2)}</div><div style={{fontSize:10,color:"rgba(255,255,255,.3)"}}>{niv===5?"prime nég.":"$/heure"}</div></div>
-    </div>
-  );
-}
-
-// ── VIEWS ─────────────────────────────────────────────────────
-function Dashboard({store, setView, setSelEmp}) {
-  const emps = Object.values(store.employees);
-  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
-  const getEvals = eid => Object.values(store.evaluations).filter(e=>e.empId===eid).sort((a,b)=>a.dateStart.localeCompare(b.dateStart));
-  if (!emps.length) return <Card><div style={{textAlign:"center",padding:48}}><div style={{fontSize:42,marginBottom:12}}>📋</div><div style={{fontWeight:600,fontSize:16,color:C.textM,marginBottom:12}}>Aucune secrétaire enregistrée</div><Btn onClick={()=>setView("new")}>✏️ Créer la première évaluation</Btn></div></Card>;
-  return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(270px,1fr))",gap:12}}>
-      {emps.map((emp,i)=>{
-        const evals=getEvals(emp.id), last=evals[evals.length-1], s=last?scoreOf(last.tasks):null, col=empColor(i);
-        const evN=last?evMap[last.evaluateur]||last.evaluateur:"";
-        return (
-          <div key={emp.id} style={{background:C.white,borderRadius:14,boxShadow:"0 3px 14px rgba(26,39,68,.09)",border:`1px solid ${C.gray}`,overflow:"hidden"}}>
-            <div style={{background:col,padding:"13px 15px",display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:38,height:38,borderRadius:9,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:C.white,flexShrink:0}}>{emp.name.charAt(0)}</div>
-              <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:C.white}}>{emp.name}</div><div style={{fontSize:11,color:"rgba(255,255,255,.65)"}}>{evals.length} éval. · {ANC_LABELS[emp.anciennete||0]}</div></div>
-            </div>
-            <div style={{padding:"11px 15px"}}>
-              {last&&s ? <>
-                <div style={{fontSize:11,color:C.textL,marginBottom:4}}>{fmtS(last.dateStart)} → {fmtS(last.dateEnd)}{evN?` · ${evN}`:""}</div>
-                <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}><Pills s={s}/></div>
-                <ProgBar s={s}/>
-              </> : <div style={{fontSize:12,color:C.textL}}>Aucune évaluation.</div>}
-              <div style={{display:"flex",gap:6,marginTop:10}}>
-                <button onClick={()=>{setSelEmp(emp.id);setView("hist");}} style={{flex:1,padding:"6px",borderRadius:7,border:`1px solid ${C.gray}`,background:C.cream,cursor:"pointer",fontSize:11,fontWeight:600,color:C.textM}}>📋 Historique</button>
-                <button onClick={()=>{setSelEmp(emp.id);setView("evol");}} style={{flex:1,padding:"6px",borderRadius:7,border:"none",background:col,cursor:"pointer",fontSize:11,fontWeight:600,color:C.white}}>📈 Évolution</button>
-                {evals.length>0&&<button onClick={()=>exportEmail(emp,evals,evMap)} style={{padding:"6px 9px",borderRadius:7,border:"none",background:C.navy,cursor:"pointer",fontSize:11,color:C.goldL}}>✉️</button>}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function NewEvaluation({store, persist, setView}) {
-  const empList = Object.values(store.employees);
-  const [empId, setEmpId] = useState("");
-  const [empName, setEmpName] = useState("");
-  const [evalId, setEvalId] = useState(store.evaluators[0]?.id||"ev1");
-  const [autreEv, setAutreEv] = useState("");
-  const [ds, setDs] = useState(todayISO());
-  const [de, setDe] = useState(todayISO());
-  const [anc, setAnc] = useState(0);
-  const [niv, setNiv] = useState(0);
-  const [tasks, setTasks] = useState(buildBlankTasks());
-  const [openLvls, setOpenLvls] = useState({1:true});
-  const [err, setErr] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const selEmp = id => { if(!id){setEmpId("");setEmpName("");return;} setEmpId(id); const e=store.employees[id]; setEmpName(e.name); setAnc(e.anciennete||0); };
-
-  const validate = (s1,e1,eid) => {
-    if(s1>e1){setErr("La date de début doit être avant la date de fin.");return false;}
-    const tid=eid||(Object.keys(store.employees).find(k=>store.employees[k].name.toLowerCase()===empName.trim().toLowerCase()));
-    if(tid){const c=Object.values(store.evaluations).find(e=>e.empId===tid&&overlaps(s1,e1,e.dateStart,e.dateEnd));if(c){setErr(`Chevauchement avec l'évaluation du ${fmtS(c.dateStart)} au ${fmtS(c.dateEnd)}.`);return false;}}
-    setErr(""); return true;
+function refreshTaskRow(k){var tr=document.getElementById("tr_"+k);if(!tr)return;var st=NE.tasks[k];var bg=st.a==="at"?"#fdf2f1":st.a==="ok"?"#fef9f4":st.a==="ex"?"#f0faf4":"#fff";var bc=st.a==="at"?"rgba(192,57,43,.25)":st.a==="ok"?"rgba(230,126,34,.2)":st.a==="ex"?"rgba(39,174,96,.2)":"transparent";tr.style.borderColor=bc;var ti=tr.querySelector(".ti");if(ti)ti.style.background=bg;tr.querySelectorAll(".apb").forEach(function(b){var sel=b.dataset.a===st.a;b.classList.toggle("sel",sel);b.style.opacity=st.a&&!sel?"0.4":"1";});var cz=tr.querySelector(".cz");if(cz)cz.classList.toggle("sh2",st.a==="at");}
+function refreshScore(){var s=sc(NE.tasks);var sg=document.getElementById("nSG");if(sg)sg.innerHTML=sGrid(s);var pb=document.getElementById("nPB");if(pb)pb.innerHTML=s.n?'<div class="pb"><div class="ps" style="width:'+pct(s.at,s.n)+'%;background:#c0392b"></div><div class="ps" style="width:'+pct(s.ok,s.n)+'%;background:#e67e22"></div><div class="ps" style="width:'+pct(s.ex,s.n)+'%;background:#27ae60"></div></div>':"";}
+function chkDates(){var dsE=document.getElementById("nDS");var deE=document.getElementById("nDE");var nES=document.getElementById("nES");var nEN=document.getElementById("nEN");if(!dsE||!deE)return true;var ds=dsE.value;var de=deE.value;var pi=document.getElementById("nPI");if(!pi)return true;if(!ds||!de){pi.innerHTML="";return true;}if(ds>de){pi.innerHTML='<div class="pi err">⚠️ La date de début doit être avant la date de fin.</div>';return false;}var empName=(nEN?nEN.value:"").trim();var empId=nES?nES.value:"";var tid=empId||(Object.keys(S.emp).find(function(k){return S.emp[k].name.toLowerCase()===empName.toLowerCase();}));if(tid){var c=Object.values(S.evl).find(function(e){return e.eid===tid&&over(ds,de,e.ds,e.de);});if(c){pi.innerHTML='<div class="pi err">⚠️ Chevauchement avec l\'évaluation du '+fmtS(c.ds)+' au '+fmtS(c.de)+'.</div>';return false;}}var days=Math.round((new Date(de)-new Date(ds))/86400000);pi.innerHTML='<div class="pi">📅 <span style="color:#2a7f7f;font-weight:600">'+fmtD(ds)+' → '+fmtD(de)+'</span><span style="font-size:11px;color:#718096;margin-left:auto">'+days+' jours</span></div>';return true;}
+function doSave(){var nEN=document.getElementById("nEN");var nES=document.getElementById("nES");var nEV=document.getElementById("nEV");var nEVO=document.getElementById("nEVO");var nDS=document.getElementById("nDS");var nDE=document.getElementById("nDE");var nANC=document.getElementById("nANC");var name=(nEN?nEN.value:"").trim();if(!name){alert("Veuillez saisir le nom de la secrétaire.");return;}var evId=nEV?nEV.value:"ev1";var evName=evId==="ev7"?(nEVO?nEVO.value:"").trim():(S.evs||[]).find(function(e){return e.id===evId;});evName=typeof evName==="object"?evName.name:evName||"";if(!evName){alert("Veuillez saisir l'évaluateur.");return;}if(!chkDates())return;var ds=nDS.value;var de=nDE.value;var anc=+(nANC?nANC.value:0);var rid=nES?nES.value:"";if(!rid){var m=Object.entries(S.emp).find(function(e){return e[1].name.toLowerCase()===name.toLowerCase();});if(m)rid=m[0];else{rid="emp_"+Date.now();S.emp[rid]={id:rid,name:name,anc:anc};}}S.emp[rid].anc=anc;var eid="eval_"+Date.now();S.evl[eid]={id:eid,eid:rid,ds:ds,de:de,ev:evId==="ev7"?(nEVO?nEVO.value.trim():""):evId,anc:anc,niv:NE.niv,tasks:NE.tasks};saveStore();document.getElementById("app").innerHTML='<div class="card" style="text-align:center;padding:40px"><div style="font-size:42px;margin-bottom:12px">✅</div><div style="font-size:19px;color:#2a7f7f;font-weight:700">Évaluation enregistrée !</div></div>';setTimeout(function(){NE={tasks:blankTasks(),niv:0,anc:0,openLvls:{1:true}};render("hist");},1400);}
+function bind(){
+  var app=document.getElementById("app");
+  app.onclick=function(e){
+    var t=e.target;
+    var go=t.closest("[data-go]");if(go){selEmp=go.dataset.emp||null;render(go.dataset.go);return;}
+    var emp=t.closest("[data-emp]");if(emp&&!t.closest("[data-go]")){selEmp=emp.dataset.emp==="null"?null:emp.dataset.emp;render();return;}
+    var mail=t.closest("[data-mail]");if(mail){doMail(mail.dataset.mail);return;}
+    var ehd=t.closest(".ehd");if(ehd){var det=document.getElementById("ed_"+ehd.dataset.evid);if(det){var op=det.classList.toggle("op");var chev=ehd.querySelector("span:last-child");if(chev)chev.textContent=op?"▴":"▾";}return;}
+    var lh=t.closest("[data-lhid]");if(lh&&view==="new"){var lid=+lh.dataset.lhid;NE.openLvls[lid]=!NE.openLvls[lid];var body=document.getElementById("lb_"+lid);if(body)body.classList.toggle("op",NE.openLvls[lid]);lh.style.background=NE.openLvls[lid]?(lid===5?"rgba(26,39,68,.05)":"rgba(42,127,127,.05)"):"#f8f5ef";var chev2=lh.querySelector("span:last-child");if(chev2)chev2.style.transform=NE.openLvls[lid]?"rotate(180deg)":"none";return;}
+    var lv=t.closest("[data-lv]");if(lv&&view==="new"){NE.niv=+lv.dataset.lv;var ls=document.getElementById("nLS");if(ls)ls.innerHTML=lvlSel(NE.niv);var rp=document.getElementById("nRP");if(rp)rp.innerHTML=rateP(NE.anc,NE.niv);return;}
+    var apb=t.closest(".apb");if(apb&&view==="new"){var k=apb.dataset.k;var a=apb.dataset.a;if(!NE.tasks[k])return;NE.tasks[k].a=NE.tasks[k].a===a?null:a;refreshTaskRow(k);refreshScore();return;}
+    if(t.id==="nSAVE"){doSave();return;}
+    if(t.id==="sAddEv"){var n=(document.getElementById("sEN")||{}).value;var r=(document.getElementById("sER")||{}).value||"";if(!n||!n.trim())return;S.evs=[...(S.evs||[]),{id:"ev_"+Date.now(),name:n.trim(),role:r.trim()}];saveStore();render();return;}
+    if(t.id==="sAddEmp"){var en=(document.getElementById("sEmpN")||{}).value;if(!en||!en.trim())return;if(Object.values(S.emp).some(function(e){return e.name.toLowerCase()===en.trim().toLowerCase();})){alert("Cette secrétaire existe déjà.");return;}var eid2="emp_"+Date.now();S.emp[eid2]={id:eid2,name:en.trim(),anc:0};saveStore();render();return;}
+    var rmev=t.closest("[data-rmev]");if(rmev){if(!confirm("Retirer cet évaluateur ?"))return;S.evs=(S.evs||[]).filter(function(e){return e.id!==rmev.dataset.rmev;});saveStore();render();return;}
+    var rmemp=t.closest("[data-rmemp]");if(rmemp){var evs2=Object.values(S.evl||{}).filter(function(e){return e.eid===rmemp.dataset.rmemp;});if(!confirm("Retirer cette secrétaire ?"+(evs2.length?" ("+evs2.length+" éval. supprimées)":"")))return;delete S.emp[rmemp.dataset.rmemp];evs2.forEach(function(e){delete S.evl[e.id];});saveStore();render();return;}
   };
-
-  const setAppr = (k,a) => setTasks(p=>({...p,[k]:{...p[k],appr:p[k].appr===a?null:a}}));
-  const setComment = (k,v) => setTasks(p=>({...p,[k]:{...p[k],comment:v}}));
-  const sc = scoreOf(tasks);
-
-  const doSave = async () => {
-    if(!empName.trim()){alert("Veuillez saisir le nom de la secrétaire.");return;}
-    const evN=evalId==="ev7"?autreEv:(store.evaluators.find(e=>e.id===evalId)?.name||"");
-    if(!evN.trim()){alert("Veuillez saisir l'évaluateur.");return;}
-    if(!validate(ds,de,empId))return;
-    setSaving(true);
-    const ns = JSON.parse(JSON.stringify(store));
-    let rid = empId;
-    if(!rid){const m=Object.entries(ns.employees).find(([,e])=>e.name.toLowerCase()===empName.trim().toLowerCase());if(m)rid=m[0];else{rid="emp_"+Date.now();ns.employees[rid]={id:rid,name:empName.trim(),anciennete:anc};}}
-    ns.employees[rid].anciennete=anc;
-    const eid="eval_"+Date.now();
-    ns.evaluations[eid]={id:eid,empId:rid,dateStart:ds,dateEnd:de,evaluateur:evalId==="ev7"?autreEv.trim():evalId,anciennete:anc,niveauLevel:niv,tasks};
-    await persist(ns);
-    setSaving(false); setSaved(true);
-    setTimeout(()=>setView("hist"),1400);
-  };
-
-  if(saved) return <Card><div style={{textAlign:"center",padding:40}}><div style={{fontSize:42,marginBottom:12}}>✅</div><div style={{fontSize:19,color:C.teal,fontWeight:700}}>Évaluation enregistrée !</div></div></Card>;
-
-  const days = ds&&de&&ds<=de ? Math.round((new Date(de)-new Date(ds))/86400000) : null;
-
-  return (
-    <div>
-      <SH title="Nouvelle évaluation" sub="Définissez la période, l'évaluateur et complétez la grille."/>
-      <Card>
-        <FL>1. Identification & période</FL>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:11,marginBottom:13}}>
-          <div><Lbl>Secrétaire évaluée</Lbl>
-            {empList.length>0&&<Sel value={empId} onChange={e=>selEmp(e.target.value)} style={{marginBottom:7}}><option value="">— Nouvelle secrétaire —</option>{empList.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</Sel>}
-            {!empId&&<Inp placeholder="Prénom et nom" value={empName} onChange={e=>setEmpName(e.target.value)}/>}
-          </div>
-          <div><Lbl>Évalué(e) par</Lbl>
-            <Sel value={evalId} onChange={e=>setEvalId(e.target.value)}>{(store.evaluators||[]).map(ev=><option key={ev.id} value={ev.id}>{ev.name}{ev.role?` — ${ev.role}`:""}</option>)}</Sel>
-            {evalId==="ev7"&&<Inp style={{marginTop:7}} placeholder="Nom" value={autreEv} onChange={e=>setAutreEv(e.target.value)}/>}
-          </div>
-          <div><Lbl>Début de la période</Lbl><Inp type="date" value={ds} onChange={e=>{setDs(e.target.value);validate(e.target.value,de,empId);}}/></div>
-          <div><Lbl>Fin de la période</Lbl><Inp type="date" value={de} onChange={e=>{setDe(e.target.value);validate(ds,e.target.value,empId);}}/></div>
-          <div><Lbl>Années d'expérience</Lbl><Sel value={anc} onChange={e=>setAnc(+e.target.value)}>{ANC_LABELS.map((l,i)=><option key={i} value={i}>{l}</option>)}</Sel></div>
-        </div>
-        {ds&&de&&ds<=de&&!err&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"9px 13px",background:"rgba(42,127,127,.06)",border:"1px solid rgba(42,127,127,.19)",borderRadius:9,marginBottom:12,fontSize:13}}>📅 <span style={{color:C.teal,fontWeight:600}}>{fmtD(ds)} → {fmtD(de)}</span><span style={{fontSize:11,color:C.textL,marginLeft:"auto"}}>{days} jours</span></div>}
-        {err&&<div style={{padding:"9px 13px",background:C.redP,border:"1px solid rgba(192,57,43,.19)",borderRadius:9,marginBottom:12,fontSize:12,color:C.red,fontWeight:500}}>⚠️ {err}</div>}
-        <Lbl>Niveau de responsabilité</Lbl>
-        <LevelSelector current={niv} onChange={v=>{setNiv(v);}}/>
-        <RatePanel anc={anc} niv={niv}/>
-      </Card>
-      <Card>
-        <FL>2. Résumé en temps réel</FL>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-          <ScoreTile n={sc.total} label="Évaluées" color={C.navy} dark/>
-          <ScoreTile n={sc.at} label="À travailler" color={C.red}/>
-          <ScoreTile n={sc.ok} label="Satisfait" color={C.orange}/>
-          <ScoreTile n={sc.ex} label="Surpasse" color={C.green}/>
-        </div>
-        <ProgBar s={sc}/>
-      </Card>
-      <Card>
-        <FL>3. Grille d'évaluation</FL>
-        <div style={{display:"flex",gap:9,flexWrap:"wrap",padding:"7px 11px",background:C.cream,borderRadius:7,border:`1px solid ${C.gray}`,marginBottom:14,alignItems:"center"}}>
-          <span style={{fontSize:11,fontWeight:700,color:C.textM}}>Appréciation :</span>
-          {[[C.red,"À travailler"],[C.orange,"Satisfait les critères"],[C.green,"Surpasse les attentes"],[C.gray,"Non évalué"]].map(([c,l])=>(
-            <span key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:7,height:7,borderRadius:"50%",background:c,flexShrink:0}}/><span style={{color:c===C.gray?C.textL:c}}>{l}</span></span>
-          ))}
-        </div>
-        {LEVELS_DATA.map(l=><LevelBlock key={l.id} level={l} tasks={tasks} setAppr={setAppr} setComment={setComment} open={!!openLvls[l.id]} onToggle={()=>setOpenLvls(p=>({...p,[l.id]:!p[l.id]}))}/>)}
-      </Card>
-      <div style={{display:"flex",justifyContent:"flex-end",gap:8,paddingBottom:36}}>
-        <button onClick={()=>setView("db")} style={{padding:"9px 18px",borderRadius:8,border:`1.5px solid ${C.gray}`,background:C.white,cursor:"pointer",fontSize:13,color:C.textM,fontWeight:600}}>Annuler</button>
-        <Btn onClick={doSave} style={{opacity:saving||!!err?.5:1,cursor:saving||!!err?"not-allowed":"pointer",background:err?C.gray:C.teal}}>{saving?"Enregistrement…":"💾 Enregistrer"}</Btn>
-      </div>
-    </div>
-  );
+  if(view==="new"){
+    var nES=document.getElementById("nES");if(nES)nES.onchange=function(){var emp=nES.value?S.emp[nES.value]:null;var nEN=document.getElementById("nEN");if(nEN){nEN.value=emp?emp.name:"";nEN.disabled=!!emp;}if(emp){NE.anc=emp.anc||0;var na=document.getElementById("nANC");if(na)na.value=NE.anc;var rp=document.getElementById("nRP");if(rp)rp.innerHTML=rateP(NE.anc,NE.niv);}chkDates();};
+    var nEN2=document.getElementById("nEN");if(nEN2)nEN2.oninput=chkDates;
+    var nEV=document.getElementById("nEV");if(nEV)nEV.onchange=function(){var o=document.getElementById("nEVO");if(o)o.classList.toggle("hidden",nEV.value!=="ev7");};
+    var nDS=document.getElementById("nDS");if(nDS)nDS.oninput=chkDates;
+    var nDE=document.getElementById("nDE");if(nDE)nDE.oninput=chkDates;
+    var nANC=document.getElementById("nANC");if(nANC)nANC.onchange=function(){NE.anc=+nANC.value;var rp=document.getElementById("nRP");if(rp)rp.innerHTML=rateP(NE.anc,NE.niv);};
+    app.oninput=function(e){var ta=e.target.closest(".ci");if(ta&&ta.dataset.k&&NE.tasks[ta.dataset.k])NE.tasks[ta.dataset.k].c=ta.value;};
+  }
 }
-
-function History({store, selEmp, setSelEmp}) {
-  const [expanded, setExpanded] = useState(null);
-  const empList = Object.values(store.employees);
-  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
-  const filtered = selEmp ? Object.values(store.evaluations).filter(e=>e.empId===selEmp).sort((a,b)=>b.dateStart.localeCompare(a.dateStart)) : Object.values(store.evaluations).sort((a,b)=>b.dateStart.localeCompare(a.dateStart));
-  return (
-    <div>
-      <SH title="Historique des évaluations" sub="Consultez toutes les évaluations par secrétaire."/>
-      <Card>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:11,fontWeight:700,color:C.textM}}>Filtrer :</span>
-          {[{id:null,name:"Toutes"},...empList].map((e,i)=>(
-            <button key={e.id||"all"} onClick={()=>setSelEmp(e.id)} style={{padding:"4px 11px",borderRadius:14,border:`1.5px solid ${selEmp===e.id?(i>0?empColor(i-1):C.teal):"#e8e3d9"}`,background:selEmp===e.id?(i>0?empColor(i-1):C.teal):C.cream,color:selEmp===e.id?C.white:C.textM,fontSize:11,fontWeight:600,cursor:"pointer"}}>{e.name}</button>
-          ))}
-        </div>
-      </Card>
-      {!filtered.length ? <Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Aucune évaluation.</div></Card> : filtered.map(ev=>{
-        const emp=store.employees[ev.empId]; const s=scoreOf(ev.tasks); const isOpen=expanded===ev.id;
-        const empI=empList.findIndex(e=>e.id===ev.empId); const col=empColor(empI);
-        const evN=evMap[ev.evaluateur]||ev.evaluateur||"—";
-        return (
-          <Card key={ev.id} style={{padding:0,overflow:"hidden"}}>
-            <div onClick={()=>setExpanded(isOpen?null:ev.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 15px",cursor:"pointer",background:isOpen?`${col}10`:C.white,borderBottom:isOpen?`1px solid ${C.gray}`:"none"}}>
-              <div style={{width:34,height:34,borderRadius:8,background:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:C.white,flexShrink:0}}>{emp?.name?.charAt(0)||"?"}</div>
-              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,color:C.navy}}>{emp?.name||"—"}</div><div style={{fontSize:11,color:C.textL,marginTop:2}}><span style={{background:`${col}22`,color:col,padding:"1px 7px",borderRadius:17,fontWeight:600,marginRight:5}}>📅 {fmtS(ev.dateStart)} → {fmtS(ev.dateEnd)}</span>Par {evN} · Niveau {ev.niveauLevel}</div></div>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}><Pills s={s}/></div>
-              <span style={{fontSize:13,color:C.textL,marginLeft:6}}>{isOpen?"▴":"▾"}</span>
-            </div>
-            {isOpen && (
-              <div style={{padding:"14px 18px"}}>
-                <div style={{display:"flex",gap:12,flexWrap:"wrap",padding:"8px 12px",background:C.cream,borderRadius:7,marginBottom:13,fontSize:12}}>
-                  <span><b>Période :</b> {fmtD(ev.dateStart)} → {fmtD(ev.dateEnd)}</span>
-                  <span><b>Évaluateur :</b> {evN}</span>
-                  <span><b>Ancienneté :</b> {ANC_LABELS[ev.anciennete||0]}</span>
-                  <span><b>Niveau :</b> {ev.niveauLevel===5?"5 (prime à déterm.)":ev.niveauLevel===0?"Aucun":"Niveau "+ev.niveauLevel}</span>
-                </div>
-                {LEVELS_DATA.map(l=>{
-                  const lt=Object.entries(ev.tasks).filter(([,v])=>v.lvlId===l.id&&v.appr); if(!lt.length) return null;
-                  return <div key={l.id} style={{marginBottom:12}}>
-                    <div style={{fontWeight:700,fontSize:12,color:l.id===5?C.navy:C.teal,borderBottom:`1px solid ${C.gray}`,paddingBottom:3,marginBottom:6}}>Niveau {l.id} — {l.title}</div>
-                    {lt.map(([k,t])=>{ const isAt=t.appr==="at",isOk=t.appr==="ok"; const bg=isAt?C.redP:isOk?C.orangeP:C.greenP; const tc=isAt?C.red:isOk?C.orange:C.green; const tl=isAt?"À travailler":isOk?"Satisfait":"Surpasse";
-                      return <div key={k} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"5px 7px",borderRadius:6,marginBottom:3,background:bg}}>
-                        <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:14,background:tc,color:C.white,flexShrink:0,marginTop:2}}>{tl}</span>
-                        <div><div style={{fontSize:12,color:C.textD}}>{t.label}</div>{isAt&&t.comment&&<div style={{fontSize:11,color:C.red,marginTop:2,fontStyle:"italic"}}>📝 {t.comment}</div>}</div>
-                      </div>;
-                    })}
-                  </div>;
-                })}
-              </div>
-            )}
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function Evolution({store, selEmp, setSelEmp}) {
-  const empList = Object.values(store.employees);
-  const ae = selEmp ? store.employees[selEmp] : null;
-  const evals = ae ? Object.values(store.evaluations).filter(e=>e.empId===selEmp).sort((a,b)=>a.dateStart.localeCompare(b.dateStart)) : [];
-  const chartData = evals.map(ev=>{ const s=scoreOf(ev.tasks); return {dt:fmtS(ev.dateStart),ex:pct(s.ex,s.total),ok:pct(s.ok,s.total),at:pct(s.at,s.total)}; });
-  const lastEval = evals[evals.length-1];
-  const radarData = lastEval ? LEVELS_DATA.map(l=>{ const lt=Object.values(lastEval.tasks).filter(t=>t.lvlId===l.id&&t.appr); const ex=lt.filter(t=>t.appr==="ex").length; const ok=lt.filter(t=>t.appr==="ok").length; const tot=lt.length; return {lv:"N"+l.id,score:tot>0?Math.round((ex*3+ok*2)/tot/3*100):0}; }) : [];
-  return (
-    <div>
-      <SH title="Évolution" sub="Progression de chaque secrétaire au fil des évaluations."/>
-      <Card>
-        <Lbl>Sélectionner une secrétaire</Lbl>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
-          {empList.map((e,i)=><button key={e.id} onClick={()=>setSelEmp(e.id)} style={{padding:"7px 15px",borderRadius:14,border:`1.5px solid ${selEmp===e.id?empColor(i):C.gray}`,background:selEmp===e.id?empColor(i):C.cream,color:selEmp===e.id?C.white:C.textM,fontSize:12,fontWeight:600,cursor:"pointer"}}>{e.name}</button>)}
-        </div>
-      </Card>
-      {!ae&&<Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Sélectionnez une secrétaire.</div></Card>}
-      {ae&&!evals.length&&<Card><div style={{textAlign:"center",padding:26,color:C.textL,fontSize:13}}>Aucune évaluation pour {ae.name}.</div></Card>}
-      {ae&&evals.length>0&&<>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:16}}>
-          {[{l:"Évaluations",v:evals.length,c:empColor(empList.findIndex(e=>e.id===ae.id))},{l:"Première",v:evals[0].dateStart.slice(0,4),c:C.textM},{l:"Dernière",v:evals[evals.length-1].dateStart.slice(0,4),c:C.textM},...(evals.length>=2?[{l:"Évol. surpasse",v:(()=>{const f=scoreOf(evals[0].tasks);const l=scoreOf(evals[evals.length-1].tasks);const d=pct(l.ex,l.total)-pct(f.ex,f.total);return(d>=0?"+":"")+d+"%"})(),c:C.green}]:[])].map(({l,v,c})=>(
-            <div key={l} style={{background:C.white,borderRadius:11,padding:13,border:`1px solid ${C.gray}`,boxShadow:"0 2px 8px rgba(26,39,68,.05)"}}><div style={{fontSize:19,fontWeight:700,color:c,lineHeight:1}}>{v}</div><div style={{fontSize:9,color:C.textL,marginTop:3,textTransform:"uppercase",letterSpacing:".05em"}}>{l}</div></div>
-          ))}
-        </div>
-        <Card><FL>Évolution des appréciations</FL><LineChart data={chartData}/></Card>
-        {radarData.some(d=>d.score>0)&&<Card><FL>Profil par niveau — dernière évaluation</FL><RadarChart data={radarData}/></Card>}
-        <Card>
-          <FL>Chronologie des périodes</FL>
-          {evals.map((ev,i)=>{ const s=scoreOf(ev.tasks); const isL=i===evals.length-1;
-            return <div key={ev.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:9,background:isL?"rgba(42,127,127,.06)":C.cream,border:`1px solid ${isL?C.teal:C.gray}`,marginBottom:6,flexWrap:"wrap"}}>
-              <div style={{width:30,height:30,borderRadius:"50%",background:isL?C.teal:"#aaa",display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontSize:10,fontWeight:700,flexShrink:0}}>{ev.dateStart.slice(0,4)}</div>
-              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12,color:C.navy}}>{fmtS(ev.dateStart)} → {fmtS(ev.dateEnd)}</div><div style={{fontSize:10,color:C.textL}}>Niveau {ev.niveauLevel}</div></div>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}><Pills s={s}/></div>
-              {isL&&<span style={{fontSize:9,background:C.teal,color:C.white,padding:"2px 6px",borderRadius:18}}>Dernière</span>}
-            </div>;
-          })}
-        </Card>
-      </>}
-    </div>
-  );
-}
-
-function Settings({store, persist}) {
-  const [newEvN, setNewEvN] = useState(""); const [newEvR, setNewEvR] = useState("");
-  const [newEmpN, setNewEmpN] = useState("");
-  const empList = Object.values(store.employees);
-  const evMap = Object.fromEntries((store.evaluators||[]).map(e=>[e.id,e.name]));
-
-  const addEv = async () => { if(!newEvN.trim()) return; const id="ev_"+Date.now(); const ns={...store,evaluators:[...(store.evaluators||[]),{id,name:newEvN.trim(),role:newEvR.trim()}]}; await persist(ns); setNewEvN(""); setNewEvR(""); };
-  const rmEv = async id => { if(!confirm("Retirer cet évaluateur ?")) return; await persist({...store,evaluators:(store.evaluators||[]).filter(e=>e.id!==id)}); };
-  const addEmp = async () => { if(!newEmpN.trim()) return; if(empList.some(e=>e.name.toLowerCase()===newEmpN.trim().toLowerCase())){alert("Cette secrétaire existe déjà.");return;} const id="emp_"+Date.now(); await persist({...store,employees:{...store.employees,[id]:{id,name:newEmpN.trim(),anciennete:0}}}); setNewEmpN(""); };
-  const rmEmp = async id => { const evs=Object.values(store.evaluations||{}).filter(e=>e.empId===id); if(!confirm(`Retirer cette secrétaire ?${evs.length?` (${evs.length} éval. supprimées)`:""}`)) return; const ns=JSON.parse(JSON.stringify(store)); delete ns.employees[id]; evs.forEach(e=>delete ns.evaluations[e.id]); await persist(ns); };
-
-  return (
-    <div>
-      <SH title="Paramètres" sub="Gérez les évaluateurs, les secrétaires et les exports."/>
-      <Card>
-        <FL>Évaluateurs</FL>
-        {(store.evaluators||[]).map(ev=>{
-          const isDef=["ev1","ev2","ev3","ev4","ev5","ev6","ev7"].includes(ev.id);
-          return <div key={ev.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:C.cream,borderRadius:8,border:`1px solid ${C.gray}`,marginBottom:6}}>
-            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:C.navy}}>{ev.name}</div>{ev.role&&<div style={{fontSize:11,color:C.textL}}>{ev.role}</div>}</div>
-            {isDef?<span style={{fontSize:9,color:C.textL,background:C.gray,padding:"2px 8px",borderRadius:18}}>Par défaut</span>:<button onClick={()=>rmEv(ev.id)} style={{padding:"3px 10px",borderRadius:6,border:`1px solid ${C.red}`,background:"transparent",color:C.red,cursor:"pointer",fontSize:11,fontWeight:600}}>Retirer</button>}
-          </div>;
-        })}
-        <div style={{background:C.greenP,border:`1.5px solid rgba(39,174,96,.2)`,borderRadius:10,padding:13,marginTop:12}}>
-          <div style={{fontWeight:600,fontSize:12,color:C.green,marginBottom:9}}>+ Ajouter un évaluateur</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:9,alignItems:"flex-end"}}>
-            <div><Lbl>Nom</Lbl><Inp placeholder="Prénom Nom" value={newEvN} onChange={e=>setNewEvN(e.target.value)}/></div>
-            <div><Lbl>Rôle</Lbl><Inp placeholder="Ex. : Assistante dentaire" value={newEvR} onChange={e=>setNewEvR(e.target.value)}/></div>
-            <Btn onClick={addEv} style={{background:C.green,padding:"9px 14px"}}>Ajouter</Btn>
-          </div>
-        </div>
-      </Card>
-      <Card>
-        <FL>Secrétaires</FL>
-        {!empList.length&&<div style={{fontSize:13,color:C.textL,padding:"8px",textAlign:"center"}}>Aucune secrétaire.</div>}
-        {empList.map((emp,i)=>{ const ec=Object.values(store.evaluations||{}).filter(e=>e.empId===emp.id).length;
-          return <div key={emp.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:C.cream,borderRadius:8,border:`1px solid ${C.gray}`,marginBottom:6}}>
-            <div style={{width:30,height:30,borderRadius:7,background:empColor(i),display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontWeight:700,fontSize:12,flexShrink:0}}>{emp.name.charAt(0)}</div>
-            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:C.navy}}>{emp.name}</div><div style={{fontSize:11,color:C.textL}}>{ANC_LABELS[emp.anciennete||0]} · {ec} éval.</div></div>
-            <button onClick={()=>rmEmp(emp.id)} style={{padding:"3px 10px",borderRadius:6,border:`1px solid ${C.red}`,background:"transparent",color:C.red,cursor:"pointer",fontSize:11,fontWeight:600}}>Retirer</button>
-          </div>;
-        })}
-        <div style={{background:"rgba(42,127,127,.05)",border:`1.5px solid rgba(42,127,127,.2)`,borderRadius:10,padding:13,marginTop:12}}>
-          <div style={{fontWeight:600,fontSize:12,color:C.teal,marginBottom:9}}>+ Ajouter une secrétaire</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:9,alignItems:"flex-end"}}>
-            <div><Lbl>Nom complet</Lbl><Inp placeholder="Prénom Nom" value={newEmpN} onChange={e=>setNewEmpN(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEmp()}/></div>
-            <Btn onClick={addEmp} style={{padding:"9px 14px"}}>Ajouter</Btn>
-          </div>
-        </div>
-      </Card>
-      <Card>
-        <FL>Export par courriel</FL>
-        <p style={{fontSize:12,color:C.textL,marginBottom:12}}>Envoyez le sommaire complet d'une secrétaire en un clic.</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:9}}>
-          {!empList.length&&<div style={{fontSize:12,color:C.textL}}>Aucune secrétaire.</div>}
-          {empList.map((emp,i)=>{ const evals=Object.values(store.evaluations||{}).filter(e=>e.empId===emp.id).sort((a,b)=>a.dateStart.localeCompare(b.dateStart));
-            return <button key={emp.id} onClick={()=>exportEmail(emp,evals,evMap)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 13px",borderRadius:10,border:`1px solid ${C.gray}`,background:C.white,cursor:"pointer",textAlign:"left",width:"100%"}}>
-              <div style={{width:32,height:32,borderRadius:7,background:empColor(i),display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontWeight:700,fontSize:12,flexShrink:0}}>{emp.name.charAt(0)}</div>
-              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12,color:C.navy}}>{emp.name}</div><div style={{fontSize:11,color:C.textL}}>{evals.length} éval. · ✉️ Exporter</div></div>
-            </button>;
-          })}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// ── APP ROOT ──────────────────────────────────────────────────
-export default function App() {
-  const [store, setStore] = useState(null); // null = loading
-  const [view, setView] = useState("db");
-  const [selEmp, setSelEmp] = useState(null);
-  const [preview, setPreview] = useState(false);
-
-  // Load from persistent storage on mount
-  useEffect(() => {
-    storage.get().then(data => {
-      if (data && data.employees) {
-        if (!data.evaluators || !data.evaluators.length) data.evaluators = JSON.parse(JSON.stringify(DEFAULT_EVALUATORS));
-        setStore(data);
-      } else {
-        setStore(emptyStore());
-      }
-    });
-  }, []);
-
-  // Persist whenever store changes
-  const persist = useCallback(async (newStore) => {
-    setStore(newStore);
-    await storage.set(newStore);
-  }, []);
-
-  if (!store) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:"'Segoe UI',Arial,sans-serif",color:C.textL,background:C.cream,fontSize:16}}>Chargement…</div>;
-
-  const activeStore = preview ? FICTION_STORE : store;
-  const navItems = [{id:"db",label:"🏠 Accueil"},{id:"new",label:"✏️ Nouvelle évaluation"},{id:"hist",label:"📋 Historique"},{id:"evol",label:"📈 Évolution"},{id:"set",label:"⚙️ Paramètres"}];
-
-  const go = v => { setView(v); };
-
-  return (
-    <div style={{fontFamily:"'Segoe UI',Arial,sans-serif",background:C.cream,minHeight:"100vh",color:C.textD}}>
-      <header style={{background:C.navy,padding:"18px 28px",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:-50,right:-50,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,.15) 0%,transparent 70%)"}}/>
-        <div style={{maxWidth:1100,margin:"0 auto",position:"relative",zIndex:1}}>
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-            <div>
-              <div style={{display:"inline-flex",alignItems:"center",gap:7,background:"rgba(201,168,76,.15)",border:"1px solid rgba(201,168,76,.3)",borderRadius:100,padding:"3px 12px 3px 7px",marginBottom:8}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:C.gold}}/><span style={{fontSize:10,fontWeight:600,letterSpacing:".08em",textTransform:"uppercase",color:C.goldL}}>Clinique Dentaire St-Étienne</span>
-              </div>
-              <h1 style={{fontSize:"clamp(15px,2.5vw,24px)",fontWeight:700,color:C.white,lineHeight:1.2}}>Échelle Salariale <span style={{color:C.gold}}>&amp; Évaluations</span>{preview&&<span style={{marginLeft:8,fontSize:10,background:"rgba(201,168,76,.3)",color:C.gold,padding:"2px 9px",borderRadius:18,verticalAlign:"middle"}}>APERÇU FICTIF</span>}</h1>
-              <nav style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:8}}>
-                {navItems.map(v=><button key={v.id} onClick={()=>go(v.id)} style={{padding:"5px 11px",borderRadius:7,border:"none",fontSize:11,fontWeight:600,cursor:"pointer",background:view===v.id?"rgba(201,168,76,.22)":"rgba(255,255,255,.07)",color:view===v.id?C.gold:"rgba(255,255,255,.6)",borderBottom:view===v.id?`2px solid ${C.gold}`:"2px solid transparent"}}>{v.label}</button>)}
-              </nav>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
-              <button onClick={()=>{setPreview(p=>!p);if(!preview&&(view==="new"||view==="set"))go("db");}} style={{fontSize:11,padding:"4px 12px",borderRadius:18,border:`1px solid ${preview?"rgba(201,168,76,.5)":"rgba(255,255,255,.18)"}`,background:preview?"rgba(201,168,76,.18)":"transparent",color:preview?C.gold:"rgba(255,255,255,.45)",cursor:"pointer",fontWeight:600}}>
-                {preview?"✕ Quitter l'aperçu fictif":"👁 Aperçu fictif"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <main style={{maxWidth:1100,margin:"0 auto",padding:"22px 14px"}}>
-        {preview&&<div style={{background:"rgba(201,168,76,.1)",border:"1px solid rgba(201,168,76,.28)",borderRadius:10,padding:"10px 15px",marginBottom:16,fontSize:13,color:C.gold,fontWeight:500}}>👁 Aperçu fictif — Sophie Beauchemin, Laura Thibodeau, Isabelle Fontaine, Maude Pelletier. Aucune donnée réelle n'est affectée.</div>}
-        {view==="db"&&<><SH title="Tableau de bord" sub="Vue d'ensemble de toutes les secrétaires."/><Dashboard store={activeStore} setView={go} setSelEmp={setSelEmp}/></>}
-        {view==="new"&&(preview?<Card><div style={{textAlign:"center",padding:30,color:C.textL,fontSize:14}}>Désactivez l'aperçu pour créer une vraie évaluation.</div></Card>:<NewEvaluation store={store} persist={persist} setView={go}/>)}
-        {view==="hist"&&<History store={activeStore} selEmp={selEmp} setSelEmp={setSelEmp}/>}
-        {view==="evol"&&<Evolution store={activeStore} selEmp={selEmp} setSelEmp={setSelEmp}/>}
-        {view==="set"&&(preview?<Card><div style={{textAlign:"center",padding:30,color:C.textL,fontSize:14}}>Paramètres désactivés en mode aperçu.</div></Card>:<Settings store={store} persist={persist}/>)}
-      </main>
-    </div>
-  );
-}
+document.getElementById("nav").addEventListener("click",function(e){var b=e.target.closest(".nb");if(b)render(b.dataset.v);});
+document.getElementById("pvBtn").addEventListener("click",function(){pv=!pv;var btn=document.getElementById("pvBtn");btn.classList.toggle("on",pv);btn.textContent=pv?"✕ Quitter l'aperçu fictif":"👁 Aperçu fictif";if(pv&&(view==="new"||view==="set"))view="db";render();});
+render();
+</script>
+</body>
+</html>
