@@ -1866,7 +1866,18 @@ async function doSend(){
     // Lire le fichier modèle
     const wb = XLSX.read(templateBuffer, { type: 'array', cellStyles: true });
 
-    // Onglets
+    // Renommer les onglets selon la période
+    const p2 = getPeriod(currentPeriodIndex);
+    const sem1deb = p2.days[0].toLocaleDateString('fr-CA',{day:'2-digit',month:'long'});
+    const sem2fin = p2.days[9].toLocaleDateString('fr-CA',{day:'2-digit',month:'long',year:'numeric'});
+    const newSheetName = `Semaine du ${sem1deb} au ${sem2fin}`.substring(0, 31);
+
+    // Renommer l'onglet Semaine
+    const oldName = wb.SheetNames[0];
+    wb.SheetNames[0] = newSheetName;
+    wb.Sheets[newSheetName] = wb.Sheets[oldName];
+    delete wb.Sheets[oldName];
+
     const wsSemaine = wb.Sheets[wb.SheetNames[0]];
     const wsHeures  = wb.Sheets[wb.SheetNames[1]];
 
