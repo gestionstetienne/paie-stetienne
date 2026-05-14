@@ -1330,7 +1330,7 @@ function buildDayCard(dayIdx,dateObj,locked) {
 
 function buildStatusSelector(dayIdx, currentStatus) {
   const opts = [
-    {v:'', label:'+ Ajouter des heures / sélectionner un statut'},
+    {v:'', label:'⚠ Si non travaillé — choisir une option ici'},
     {v:'ne_travaille_pas', label:'— Ne travaille pas cette journée'},
     {v:'vacances', label:'🏖  Vacances / congé à payer (banque)'},
     {v:'ferie', label:'🎉  Jour férié'},
@@ -1338,10 +1338,16 @@ function buildStatusSelector(dayIdx, currentStatus) {
     {v:'absent_sans_solde', label:'🚫  Absent sans solde'},
   ];
   return `<div style="margin-bottom:10px">
+    ${!currentStatus ? `<div style="font-size:13px;font-weight:700;color:#DC2626;margin-bottom:6px">
+      ⚠ Si non travaillé — choisir une option ici
+    </div>` : ''}
     <select onchange="setDayStatus(${dayIdx},this.value)"
-      style="width:100%;padding:9px 12px;border:1.5px solid ${currentStatus?'var(--navy)':'var(--border)'};
+      style="width:100%;padding:9px 12px;
+        border:1.5px solid ${currentStatus?'var(--navy)':'#DC2626'};
         border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;
-        background:${currentStatus?'#EBF2FB':'var(--surface)'};color:var(--text);cursor:pointer">
+        background:${currentStatus?'#EBF2FB':'#FEF2F2'};
+        color:${currentStatus?'var(--text)':'#DC2626'};
+        font-weight:${currentStatus?'400':'600'};cursor:pointer">
       ${opts.map(o=>`<option value="${o.v}" ${currentStatus===o.v?'selected':''}>${o.label}</option>`).join('')}
     </select>
   </div>`;
