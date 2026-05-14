@@ -954,6 +954,7 @@ async function loadAllPeriodSupabaseOnly(pi) {
     const rows = await sbFetch(`saisies?periode_index=eq.${pi}&order=emp_name,day_index,seg_index`);
     const byEmp = {};
     rows.forEach(r => {
+      if (r.seg_index === 99) return; // Ignorer les lignes de statut
       if (!byEmp[r.emp_name]) byEmp[r.emp_name] = {};
       if (!byEmp[r.emp_name][r.day_index]) byEmp[r.emp_name][r.day_index] = [];
       while (byEmp[r.emp_name][r.day_index].length <= r.seg_index)
