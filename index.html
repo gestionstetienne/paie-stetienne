@@ -1294,6 +1294,7 @@ function buildDayCard(dayIdx,dateObj,locked) {
   const isToday=dateObj.getTime()===today.getTime();
   const total=getDayTotal(dayIdx);
   const status=getDayStatus(dayIdx);
+  const segsExist=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx).length > 0;
   const card=document.createElement('div');
   card.className='day-card'+(locked?' locked':''); card.id=`dc_${dayIdx}`;
 
@@ -1318,17 +1319,28 @@ function buildDayCard(dayIdx,dateObj,locked) {
       </div>
     </div>
     <div class="day-body" id="db_${dayIdx}">
-      ${locked?'':buildStatusSelector(dayIdx, status)}
+      ${locked?'':buildStatusSelector(dayIdx, status, segsExist)}
       <div class="segs" id="segs_${dayIdx}"></div>
       ${locked||status?'':
         `<button class="add-seg-btn" onclick="addSeg(${dayIdx})">+ Ajouter une entrée / sortie</button>`}
       <div class="day-sum" id="ds_${dayIdx}"></div>
     </div>`;
-  setTimeout(()=>{ renderSegs(dayIdx,locked); updateDaySummary(dayIdx); if(isToday) toggleDay(dayIdx,true); },0);
+  setTimeout(()=>{
+    renderSegs(dayIdx,locked);
+    updateDaySummary(dayIdx);
+    if(isToday) toggleDay(dayIdx,true);
+    // Masquer le sélecteur de statut si des segments avec heures existent
+    const segs = getEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx);
+    const hasRealSegs = segs.some(s => s.entree || s.sortie || s.dentist);
+    if (hasRealSegs && !status) {
+      const statusDiv = document.querySelector(`#db_${dayIdx} .status-selector`);
+      if (statusDiv) statusDiv.style.display = 'none';
+    }
+  },0);
   return card;
 }
 
-function buildStatusSelector(dayIdx, currentStatus) {
+function buildStatusSelector(dayIdx, currentStatus, segsExist) {
   const opts = [
     {v:'', label:'⚠ Si non travaillé — choisir une option ici'},
     {v:'ne_travaille_pas', label:'— Ne travaille pas cette journée'},
@@ -1337,7 +1349,7 @@ function buildStatusSelector(dayIdx, currentStatus) {
     {v:'maladie', label:'🤒  Maladie / absence à payer (banque)'},
     {v:'absent_sans_solde', label:'🚫  Absent sans solde'},
   ];
-  return `<div style="margin-bottom:10px">
+  return `<div class="status-selector" style="margin-bottom:10px">
     ${!currentStatus ? `<div style="font-size:13px;font-weight:700;color:#DC2626;margin-bottom:6px">
       ⚠ Si non travaillé — choisir une option ici
     </div>` : ''}
@@ -1503,6 +1515,12 @@ function updSeg(dayIdx,si,field,value) {
   setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
   if(field==='dentist'||field==='entree'||field==='sortie') revalDay(dayIdx);
+  // Masquer le sélecteur de statut si des heures sont saisies
+  const hasRealSegs = segs.some(s => s.entree || s.sortie || s.dentist);
+  if (hasRealSegs) {
+    const statusDiv = document.querySelector(`#db_${dayIdx} .status-selector`);
+    if (statusDiv) statusDiv.style.display = 'none';
+  }
 }
 
 function revalSeg(dayIdx,si) {
