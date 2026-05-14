@@ -2083,7 +2083,22 @@ async function doSend(){
       ws[cellRef] = { v: value, t: 's' };
     }
 
-    // Labels courts des statuts pour l'export Excel
+    // ── Insérer dans Semaine ──
+    Object.entries(data.Semaine).forEach(([rowStr, cols]) => {
+      const row = parseInt(rowStr);
+      Object.entries(cols).forEach(([colIdx, val]) => {
+        if (val && val > 0) writeCell(wsSemaine, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
+      });
+    });
+
+    // ── Insérer dans Heures ──
+    Object.entries(data.Heures).forEach(([rowStr, cols]) => {
+      const row = parseInt(rowStr);
+      Object.entries(cols).forEach(([colIdx, val]) => {
+        if (val && val > 0) writeCell(wsHeures, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
+      });
+    });
+
     // ── Colonne Y (index 24) — En-têtes commentaires (onglet Semaine) ──
     writeTextCell(wsSemaine, 2, 24, 'Commentaires');
     writeTextCell(wsSemaine, 3, 24, 'Statut / Absence');
@@ -2108,22 +2123,15 @@ async function doSend(){
       statusByEmp[r.emp_name].push(`${dayLabelsExport[r.day_index]}: ${code}`);
     });
 
+    // Écrire notes : col Y (index 24) dans Semaine, col X (index 23) dans Heures
     Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
       if (empName.includes('2e soir')) return;
       const comments = statusByEmp[empName];
       if (comments && comments.length > 0) {
         const comment = comments.join(' | ');
-        writeTextCell(wsSemaine, row, 24, comment);
-        writeTextCell(wsHeures,  row, 23, comment);
+        writeTextCell(wsSemaine, row, 24, comment); // col Y onglet Semaine
+        writeTextCell(wsHeures,  row, 23, comment); // col X onglet Heures
       }
-    });
-
-    // Insérer dans Heures
-    Object.entries(data.Heures).forEach(([rowStr, cols]) => {
-      const row = parseInt(rowStr);
-      Object.entries(cols).forEach(([colIdx, val]) => {
-        if (val && val > 0) writeCell(wsHeures, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
-      });
     });
 
 
