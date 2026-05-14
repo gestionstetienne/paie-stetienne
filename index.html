@@ -2126,28 +2126,6 @@ async function doSend(){
       });
     });
 
-    // ── Colonne Y (index 24) — En-têtes commentaires (onglet Semaine) ──
-    writeTextCell(wsSemaine, 2, 24, 'Commentaires');
-    writeTextCell(wsSemaine, 3, 24, 'Statut / Absence');
-
-    // ── Colonne Y — Statuts des journées pour chaque employée (onglet Semaine) ──
-    // ── Colonne X (index 23) — Statuts dans "Note" (onglet Heures et proportions) ──
-    Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
-      if (empName.includes('2e soir')) return;
-      const comments = [];
-      const dayLabels = ['Lun S1','Mar S1','Mer S1','Jeu S1','Ven S1','Lun S2','Mar S2','Mer S2','Jeu S2','Ven S2'];
-      for (let i = 0; i < 10; i++) {
-        const status = localStorage.getItem(`status_${currentPeriodIndex}_${empName}_${i}`);
-        if (status && STATUS_LABELS[status] && status !== 'ne_travaille_pas') {
-          comments.push(`${dayLabels[i]}: ${STATUS_LABELS[status]}`);
-        }
-      }
-      if (comments.length > 0) {
-        const comment = comments.join(' | ');
-        writeTextCell(wsSemaine, row, 24, comment);   // col Y dans Semaine
-        writeTextCell(wsHeures,  row, 23, comment);   // col X (Note) dans Heures
-      }
-    });
 
     // Générer le fichier final
     const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
