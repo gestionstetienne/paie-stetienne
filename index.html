@@ -2199,6 +2199,12 @@ function saveSettings(){
   settings.email=document.getElementById('settingEmail').value.trim()||DEFAULT_SETTINGS.email;
   settings.anchorDate=document.getElementById('settingAnchor').value||DEFAULT_SETTINGS.anchorDate;
   saveConfig();
+  // Sauvegarder la date d'ancrage dans Supabase pour tous les appareils
+  sbFetch('app_settings?on_conflict=key', {
+    method:'POST',
+    prefer:'return=minimal,resolution=merge-duplicates',
+    body:JSON.stringify({key:'anchorDate', value:settings.anchorDate})
+  }).catch(e => console.warn('Impossible de sauvegarder ancre dans Supabase:', e));
   document.getElementById('schedEmail').textContent=settings.email;
   updatePeriodUI(); updateNextSendLabel();
   toast('Paramètres enregistrés ✓','ok'); closeAdmin();
@@ -2237,16 +2243,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(!dentists.find(d=>d.key===k)){const d=DEFAULT_DENTISTS.find(x=>x.key===k);if(d)dentists.push(d);}
   });
 
-  // Charger les courriels depuis Supabase pour pré-remplir lors de la connexion
+  // Charger la date d'ancrage depuis Supabase pour uniformiser tous les appareils
   try {
-    const rows = await sbFetch('employe_emails');
-    rows.forEach(r => {
-      const emp = employees.find(e => e.name === r.emp_name);
-      if (emp && r.email) emp.email = r.email;
-    });
-    saveConfig(); // Mettre à jour le cache local
+    const rows = await sbFetch('app_settings?key=eq.anchorDate');
+    if (rows && rows.length > 0) {
+      const serverAnchor = rows[0].value;
+      if (serverAnchor && serverAnchor !== settings.anchorDate) {
+        settings.anchorDate = serverAnchor;
+        saveConfig();
+        console.log('Ancre synchronisée depuis Supabase:', serverAnchor);
+      }
+    }
   } catch(e) {
-    console.warn('Impossible de charger les courriels depuis Supabase:', e);
+    console.warn('Impossible de charger la date ancre depuis Supabase:', e);
   }
 
   hideLoadingOverlay();
