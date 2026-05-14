@@ -1666,8 +1666,12 @@ function updateSummary(){
     const w=i<5?1:2;
     const status=getDayStatus(i);
     const statusLabel=status?STATUS_SHORT[status]||'':'';
+    // Journée manquante = pas d'heures ET pas de statut
+    const isMissing = dt === 0 && !status;
     const tr=document.createElement('tr');
-    const cells=[`<td><strong>${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`];
+    if(isMissing) tr.style.background='#FEF2F2';
+    const dayColor = isMissing ? '#DC2626' : 'var(--text)';
+    const cells=[`<td><strong style="color:${dayColor}">${isMissing?'⚠ ':''}${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`];
     dentists.forEach(d=>{const h=byD[d.key]||0;cells.push(`<td class="${h>0?'cell-v':'cell-n'}">${h>0?fmtH(h):'—'}</td>`);});
     cells.push(`<td style="font-size:11px;font-weight:600;color:${statusLabel&&statusLabel!=='—'?'#DC2626':'var(--muted)'}">${statusLabel||''}</td>`);
     cells.push(`<td><strong>${dt>0?fmtH(dt):'—'}</strong></td>`);
