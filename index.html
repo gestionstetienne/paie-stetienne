@@ -1588,114 +1588,126 @@ async function showApercu() {
   if(!currentEmployee) return;
   const p = getPeriod(currentPeriodIndex);
 
-  // Charger période précédente si besoin (pour comparaison)
-  showLoadingOverlay('Préparation de l\'aperçu…');
-  if(currentPeriodIndex > 0) {
-    // Charger depuis localStorage d'abord pour la période précédente
-    employees.forEach(emp => {
-      const k = ck(currentPeriodIndex-1, emp.name);
-      if (!_cache[k]) {
-        try {
-          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-          if (local) _cache[k] = local;
-        } catch(e) {}
-      }
-    });
-  }
+  showLoadingOverlay('Preparation de l\'apercu...');
+  await loadAllPeriodSupabaseOnly(currentPeriodIndex);
   hideLoadingOverlay();
 
-  // Section 1 — Erreurs (validation + chevauchements)
-  const errors=[];
-  for(let i=0;i<10;i++) {
-    getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach((seg,si)=>{
-      const v=validate(seg); if(v.error) errors.push(`${DAYS_FR[i%5]} Sem${i<5?1:2}, seg ${si+1} : ${v.msg}`);
-    });
-    const overlaps = checkOverlaps(i);
-    const p2 = getPeriod(currentPeriodIndex);
-    overlaps.forEach(e => errors.push(
-      `${DAYS_FR[i%5]} Sem${i<5?1:2} (${p2.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}) : ${e.msg}`
-    ));
-  }
-  const errDiv=document.getElementById('apercuErrors'), errOk=document.getElementById('apercuOk');
-  if(errors.length){errDiv.style.display='block';errOk.style.display='none';
-    document.getElementById('apercuErrorList').innerHTML=errors.map(e=>`<div>• ${e}</div>`).join('');}
-  else{errDiv.style.display='none';errOk.style.display='block';}
-
-  // Section 2 — Tableau
-  document.getElementById('apercuPeriodLabel').textContent=`${fmtDate(p.start,true)} au ${fmtDate(p.end)}`;
-  const activeDents=dentists.filter(d=>{let t=0;for(let i=0;i<10;i++)getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{const v=validate(s);if(v.valid&&s.dentist===d.key)t+=v.hrs;});return t>0;});
-  const curTotals={};let curGrand=0;
+  const errDiv=document.getElementById('apercuErrors');
+  const errOk=document.getElementById('apercuOk');
   const thead=document.getElementById('apercuThead');
-  thead.innerHTML=`<th style="text-align:left">Journée</th>${activeDents.map(d=>`<th>${d.short}</th>`).join('')}<th>Total</th>`;
-  const tbody=document.getElementById('apercuTbody'); tbody.innerHTML='';
-  for(let i=0;i<10;i++){
-    const byD=getDayByDentist(i),dt=getDayTotal(i); curGrand+=dt;
-    activeDents.forEach(d=>curTotals[d.key]=(curTotals[d.key]||0)+(byD[d.key]||0));
-    const w=i<5?1:2;
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="text-align:left"><strong>${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`+
-      activeDents.map(d=>{const h=byD[d.key]||0;return`<td style="color:${h>0?'var(--text)':'var(--light)'}">${h>0?fmtH(h):'—'}</td>`;}).join('')+
-      `<td><strong>${dt>0?fmtH(dt):'—'}</strong></td>`;
-    tbody.appendChild(tr);
-  }
+  const tbody=document.getElementById('apercuTbody');
   const tfoot=document.getElementById('apercuTfoot');
-  tfoot.innerHTML=`<td style="text-align:left">TOTAL</td>${activeDents.map(d=>`<td>${curTotals[d.key]>0?fmtH(curTotals[d.key]):'—'}</td>`).join('')}<td>${curGrand>0?fmtH(curGrand):'—'}</td>`;
-
-  // Section 3 — Comparaison par employée
-  const compareDiv=document.getElementById('apercuCompare');
   const cs=document.getElementById('apercuCompareSection');
-  if(currentPeriodIndex===0){cs.style.display='none';}
-  else{
-    cs.style.display='block';
-    const empCur={},empPrev={};
-    employees.forEach(emp=>{
-      let c=0; for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)c+=v.hrs;});
-      if(c>0) empCur[emp.name]=c;
-      let p2=0; for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex-1,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)p2+=v.hrs;});
-      if(p2>0) empPrev[emp.name]=p2;
+  cs.style.display='none';
+
+  if (isAdmin) {
+    // VUE ADMIN — toutes les employées
+    const allErrors = [];
+    employees.forEach(emp => {
+      for(let i=0;i<10;i++) {
+        getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach((seg,si)=>{
+          const v=validate(seg);
+          if(v.error) allErrors.push(emp.name+' — '+DAYS_FR[i%5]+' Sem'+(i<5?1:2)+' seg '+(si+1)+' : '+v.msg);
+        });
+        checkOverlapsForEmp(emp.name,i).forEach(e=>
+          allErrors.push(emp.name+' — '+DAYS_FR[i%5]+' Sem'+(i<5?1:2)+' : '+e.msg)
+        );
+      }
     });
-    const allEmps=[...new Set([...Object.keys(empCur),...Object.keys(empPrev)])];
-    if(!allEmps.length){compareDiv.innerHTML='<div style="color:var(--muted);font-style:italic">Aucune donnée pour la période précédente.</div>';}
-    else{
-      let rows=[],hasDiff=false,grandC=0,grandP=0;
-      allEmps.forEach(name=>{
-        const cur=empCur[name]||0,prev=empPrev[name]||0; grandC+=cur; grandP+=prev;
-        const diff=cur-prev,abs=Math.abs(diff),isSig=abs>10; if(isSig)hasDiff=true;
-        const pct=prev>0?Math.round(diff/prev*100):(cur>0?100:0);
-        const diffColor=diff>10?'#16A34A':diff<-10?'#DC2626':'#6B7A99';
-        const icon=diff>10?'↑':diff<-10?'↓':'≈';
-        const diffTxt=abs>0?`${diff>0?'+':''}${fmtH(abs)}${prev>0?` (${diff>0?'+':''}${pct}%)`:''}`:'=';
-        const bg=isSig?(diff>0?'#DCFCE7':'#FEE2E2'):'var(--surf2)';
-        const bd=isSig?(diff>0?'#BBF7D0':'#FECACA'):'var(--border)';
-        rows.push(`<div class="cmp-row ${isSig?(diff>0?'up':'down'):''}">
-          <span class="cmp-name">${name.replace(' 2e soir',' ✦')}</span>
-          <span class="cmp-vals">${prev>0?fmtH(prev):'—'} → ${cur>0?fmtH(cur):'—'}</span>
-          <span class="cmp-diff ${diff>10?'diff-up':diff<-10?'diff-down':'diff-neut'}">${icon} ${diffTxt}</span>
-        </div>`);
-      });
-      const td=grandC-grandP,tp=grandP>0?Math.round(td/grandP*100):0;
-      const html=(hasDiff
-        ?`<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:9px 13px;margin-bottom:10px;font-size:12px;color:#92400E">⚠ Des différences de plus de 10h ont été détectées. Veuillez vérifier avant d'envoyer.</div>`
-        :`<div style="background:var(--ok-l);border:1px solid var(--ok);border-radius:8px;padding:9px 13px;margin-bottom:10px;font-size:12px;color:var(--ok)">✓ Les heures sont cohérentes (variations &lt;10h).</div>`
-      )+rows.join('')+
-      `<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--navy2);border-radius:8px;margin-top:8px;color:#fff">
-        <span style="font-weight:700;font-size:12px;min-width:130px">TOTAL TOUTES</span>
-        <span style="font-size:11px;font-family:'DM Mono',monospace;flex:1;opacity:.75">${fmtH(grandP)} → ${fmtH(grandC)}</span>
-        <span style="font-weight:700;font-size:13px;color:${Math.abs(td)>10?(td>0?'#86EFAC':'#FCA5A5'):'rgba(255,255,255,.8)'}">
-          ${td>0?'+':''}${fmtH(td)} (${td>0?'+':''}${tp}%)</span>
-      </div>`;
-      compareDiv.innerHTML=html;
+    if(allErrors.length){
+      errDiv.style.display='block'; errOk.style.display='none';
+      document.getElementById('apercuErrorList').innerHTML=allErrors.map(e=>'<div>• '+e+'</div>').join('');
+    } else {
+      errDiv.style.display='none'; errOk.style.display='block';
     }
+
+    document.getElementById('apercuPeriodLabel').textContent=fmtDate(p.start,true)+' au '+fmtDate(p.end);
+    const catColors={'Administration':'#2E75B6','Assistante':'#70AD47','Hygieniste':'#ED7D31'};
+    thead.innerHTML='<th style="text-align:left">Employe</th><th>Categorie</th><th>Sem 1</th><th>Sem 2</th><th>Total</th><th>Statut</th>';
+    tbody.innerHTML='';
+    let grandTotal=0;
+
+    const empsWithHours=employees.filter(emp=>{
+      let t=0; for(let i=0;i<10;i++) getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)t+=v.hrs;});
+      return t>0;
+    });
+    const empsWithout=employees.filter(emp=>
+      !emp.name.includes('2e soir') &&
+      !empsWithHours.find(e=>e.name===emp.name||e.name===emp.name+' 2e soir')
+    );
+
+    empsWithHours.forEach(emp=>{
+      let sem1=0,sem2=0;
+      for(let i=0;i<5;i++) getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)sem1+=v.hrs;});
+      for(let i=5;i<10;i++) getEmpDaySegs(currentPeriodIndex,emp.name,i).forEach(s=>{const v=validate(s);if(v.valid)sem2+=v.hrs;});
+      const tot=sem1+sem2; grandTotal+=tot;
+      let hasConflict=false;
+      for(let i=0;i<10;i++) if(checkOverlapsForEmp(emp.name,i).length>0){hasConflict=true;break;}
+      const catColor=catColors[emp.cat]||'#666';
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td style="text-align:left;font-weight:600">'+emp.name.replace(' 2e soir',' ')+'</td>'+
+        '<td style="color:'+catColor+';font-size:11px">'+emp.cat+'</td>'+
+        '<td style="font-family:monospace">'+(sem1>0?fmtH(sem1):'—')+'</td>'+
+        '<td style="font-family:monospace">'+(sem2>0?fmtH(sem2):'—')+'</td>'+
+        '<td style="font-weight:700;font-family:monospace">'+fmtH(tot)+'</td>'+
+        '<td>'+(hasConflict
+          ?'<span style="color:#DC2626;font-size:11px;font-weight:700">⚠ Conflit</span>'
+          :'<span style="color:#16A34A;font-size:11px">✓</span>')+'</td>';
+      tbody.appendChild(tr);
+    });
+
+    empsWithout.forEach(emp=>{
+      const tr=document.createElement('tr');
+      tr.style.background='#FEF2F2';
+      tr.innerHTML='<td style="text-align:left;color:#DC2626">'+emp.name+'</td>'+
+        '<td style="color:'+((catColors[emp.cat])||'#666')+';font-size:11px">'+emp.cat+'</td>'+
+        '<td>—</td><td>—</td><td>—</td>'+
+        '<td><span style="color:#DC2626;font-size:11px;font-weight:700">⚠ Manquant</span></td>';
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML='<td style="text-align:left">TOTAL</td><td></td><td></td><td></td>'+
+      '<td style="font-weight:700">'+(grandTotal>0?fmtH(grandTotal):'—')+'</td><td></td>';
+
+  } else {
+    // VUE EMPLOYEE — ses propres heures
+    const errors=[];
+    for(let i=0;i<10;i++) {
+      getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach((seg,si)=>{
+        const v=validate(seg); if(v.error) errors.push(DAYS_FR[i%5]+' Sem'+(i<5?1:2)+', seg '+(si+1)+' : '+v.msg);
+      });
+      checkOverlaps(i).forEach(e=>errors.push(DAYS_FR[i%5]+' Sem'+(i<5?1:2)+' : '+e.msg));
+    }
+    if(errors.length){errDiv.style.display='block';errOk.style.display='none';
+      document.getElementById('apercuErrorList').innerHTML=errors.map(e=>'<div>• '+e+'</div>').join('');}
+    else{errDiv.style.display='none';errOk.style.display='block';}
+
+    document.getElementById('apercuPeriodLabel').textContent=fmtDate(p.start,true)+' au '+fmtDate(p.end);
+    const activeDents=dentists.filter(d=>{let t=0;for(let i=0;i<10;i++)getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{const v=validate(s);if(v.valid&&s.dentist===d.key)t+=v.hrs;});return t>0;});
+    thead.innerHTML='<th style="text-align:left">Journee</th>'+activeDents.map(d=>'<th>'+d.short+'</th>').join('')+'<th>Total</th>';
+    tbody.innerHTML='';
+    const curTotals={};let curGrand=0;
+    for(let i=0;i<10;i++){
+      const byD=getDayByDentist(i),dt=getDayTotal(i); curGrand+=dt;
+      activeDents.forEach(d=>curTotals[d.key]=(curTotals[d.key]||0)+(byD[d.key]||0));
+      const w=i<5?1:2;
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td style="text-align:left"><strong>'+DAYS_FR[i%5]+'</strong> <span style="color:var(--muted);font-size:10px">S'+w+' '+p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})+'</span></td>'+
+        activeDents.map(d=>{const h=byD[d.key]||0;return'<td style="color:'+(h>0?'var(--text)':'var(--light)')+'>'+(h>0?fmtH(h):'—')+'</td>';}).join('')+
+        '<td><strong>'+(dt>0?fmtH(dt):'—')+'</strong></td>';
+      tbody.appendChild(tr);
+    }
+    tfoot.innerHTML='<td style="text-align:left">TOTAL</td>'+activeDents.map(d=>'<td>'+(curTotals[d.key]>0?fmtH(curTotals[d.key]):'—')+'</td>').join('')+'<td>'+(curGrand>0?fmtH(curGrand):'—')+'</td>';
   }
 
   const sendBtn=document.getElementById('apercuSendBtn');
-  const hasErrors = errors.length > 0;
-  sendBtn.style.opacity = hasErrors ? '0.45' : '1';
-  sendBtn.style.cursor  = hasErrors ? 'not-allowed' : 'pointer';
-  sendBtn.disabled      = hasErrors;
-  sendBtn.title         = hasErrors ? 'Corrigez les erreurs et conflits avant d\'envoyer.' : '';
-  sendBtn.style.display = isAdmin ? '' : 'none';
-  sendBtn.onclick       = hasErrors ? null : ()=>{ closeApercu(); showSendModal(); };
+  const errListEl=document.getElementById('apercuErrorList');
+  const hasErrors=errDiv.style.display!=='none'&&errListEl.children.length>0;
+  sendBtn.style.opacity=hasErrors?'0.45':'1';
+  sendBtn.style.cursor=hasErrors?'not-allowed':'pointer';
+  sendBtn.disabled=hasErrors;
+  sendBtn.style.display=isAdmin?'':'none';
+  sendBtn.onclick=hasErrors?null:()=>{closeApercu();showSendModal();};
   document.getElementById('apercuModal').classList.add('open');
 }
 
