@@ -1504,9 +1504,15 @@ function addSeg(dayIdx) {
 }
 
 function delSeg(dayIdx,si) {
-   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
+  const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
   segs.splice(si,1); setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
+  // Si plus aucun segment réel, réafficher le sélecteur de statut
+  const hasRealSegs = segs.some(s => s.entree || s.sortie || s.dentist);
+  if (!hasRealSegs) {
+    const statusDiv = document.querySelector(`#db_${dayIdx} .status-selector`);
+    if (statusDiv) statusDiv.style.display = '';
+  }
 }
 
 function updSeg(dayIdx,si,field,value) {
