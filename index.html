@@ -1169,6 +1169,14 @@ async function showApp() {
         // Supabase a des données — les utiliser seulement si plus récentes
         const data = {};
         rows.forEach(r => {
+          if (r.seg_index === 99) {
+            // Statut de journée — sauvegarder dans localStorage
+            if (r.day_status) {
+              const sk = `status_${currentPeriodIndex}_${currentEmployee}_${r.day_index}`;
+              localStorage.setItem(sk, r.day_status);
+            }
+            return;
+          }
           if (!data[r.day_index]) data[r.day_index] = [];
           while (data[r.day_index].length <= r.seg_index)
             data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
