@@ -1396,19 +1396,28 @@ async function setDayStatus(dayIdx, status) {
     setEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx, []);
     // Sauvegarder le statut dans Supabase via une ligne spéciale seg_index=99
     try {
-      await sbFetch('saisies?on_conflict=periode_index,emp_name,day_index,seg_index', {
-        method: 'POST',
-        prefer: 'return=minimal,resolution=merge-duplicates',
-        body: JSON.stringify([{
-          periode_index: currentPeriodIndex,
-          emp_name: currentEmployee,
-          day_index: dayIdx,
-          seg_index: 99, // Index spécial pour les statuts
-          entree: null, sortie: null, pause: 0, dentist: null,
-          day_status: status,
-          updated_at: new Date().toISOString()
-        }])
-      });
+      const res = await fetch(
+        `https://jurtntqtitbefdvyetyz.supabase.co/rest/v1/saisies?on_conflict=periode_index,emp_name,day_index,seg_index`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal,resolution=merge-duplicates'
+          },
+          body: JSON.stringify([{
+            periode_index: currentPeriodIndex,
+            emp_name: currentEmployee,
+            day_index: dayIdx,
+            seg_index: 99,
+            entree: null, sortie: null, pause: 0, dentist: null,
+            day_status: status,
+            updated_at: new Date().toISOString()
+          }])
+        }
+      );
+      if (!res.ok) console.warn('setDayStatus save error:', res.status, await res.text());
     } catch(e) { console.warn('setDayStatus save:', e); }
   }
 
