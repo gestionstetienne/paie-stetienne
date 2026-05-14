@@ -2181,6 +2181,8 @@ async function doSend(){
 
 
     // Générer le fichier final
+    console.log('wsSemaine !ref:', wsSemaine['!ref']);
+    console.log('wsSemaine Y18:', JSON.stringify(wsSemaine[XLSX.utils.encode_cell({r:17,c:24})]));
     const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
 
     hideLoadingOverlay();
