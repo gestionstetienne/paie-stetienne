@@ -1650,21 +1650,31 @@ function updateSummary(){
   if(!currentEmployee)return;
   const p=getPeriod(currentPeriodIndex);
   const totals={}; dentists.forEach(d=>totals[d.key]=0); let grand=0;
+
+  // Labels courts des statuts
+  const STATUS_SHORT = {
+    'vacances':'VB', 'ferie':'JF', 'maladie':'MB',
+    'absent_sans_solde':'ASS', 'ne_travaille_pas':'—'
+  };
+
   const thead=document.getElementById('sumThead');
-  thead.innerHTML=`<th>Journée</th>${dentists.map(d=>`<th>${d.short}</th>`).join('')}<th>Total</th>`;
+  thead.innerHTML=`<th>Journée</th>${dentists.map(d=>`<th>${d.short}</th>`).join('')}<th>Note</th><th>Total</th>`;
   const tbody=document.getElementById('sumBody'); tbody.innerHTML='';
   for(let i=0;i<10;i++){
     const byD=getDayByDentist(i),dt=getDayTotal(i);grand+=dt;
     dentists.forEach(d=>totals[d.key]+=(byD[d.key]||0));
     const w=i<5?1:2;
+    const status=getDayStatus(i);
+    const statusLabel=status?STATUS_SHORT[status]||'':'';
     const tr=document.createElement('tr');
     const cells=[`<td><strong>${DAYS_FR[i%5]}</strong> <span style="color:var(--muted);font-size:10px">S${w} ${p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span></td>`];
     dentists.forEach(d=>{const h=byD[d.key]||0;cells.push(`<td class="${h>0?'cell-v':'cell-n'}">${h>0?fmtH(h):'—'}</td>`);});
+    cells.push(`<td style="font-size:11px;font-weight:600;color:${statusLabel&&statusLabel!=='—'?'#DC2626':'var(--muted)'}">${statusLabel||''}</td>`);
     cells.push(`<td><strong>${dt>0?fmtH(dt):'—'}</strong></td>`);
     tr.innerHTML=cells.join(''); tbody.appendChild(tr);
   }
   const tfoot=document.getElementById('sumTfoot');
-  tfoot.innerHTML=`<td>TOTAL</td>${dentists.map(d=>`<td>${totals[d.key]>0?fmtH(totals[d.key]):'—'}</td>`).join('')}<td>${grand>0?fmtH(grand):'—'}</td>`;
+  tfoot.innerHTML=`<td>TOTAL</td>${dentists.map(d=>`<td>${totals[d.key]>0?fmtH(totals[d.key]):'—'}</td>`).join('')}<td></td><td>${grand>0?fmtH(grand):'—'}</td>`;
   document.getElementById('weekSummary').style.display=grand>0?'block':'none';
 }
 
