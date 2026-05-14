@@ -2091,7 +2091,18 @@ async function doSend(){
     // Fonction pour écrire du texte dans une cellule
     function writeTextCell(ws, row, colIdx, value) {
       const cellRef = XLSX.utils.encode_cell({ r: row - 1, c: colIdx });
-      ws[cellRef] = { v: value, t: 's' };
+      ws[cellRef] = { v: value, t: 's', w: value };
+      // Mettre à jour le !ref pour inclure cette cellule
+      if (ws['!ref']) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        if (row - 1 > range.e.r) range.e.r = row - 1;
+        if (colIdx > range.e.c) range.e.c = colIdx;
+        if (row - 1 < range.s.r) range.s.r = row - 1;
+        if (colIdx < range.s.c) range.s.c = colIdx;
+        ws['!ref'] = XLSX.utils.encode_range(range);
+      } else {
+        ws['!ref'] = XLSX.utils.encode_range({s:{r:row-1,c:colIdx},e:{r:row-1,c:colIdx}});
+      }
     }
 
     // ── Insérer dans Semaine ──
