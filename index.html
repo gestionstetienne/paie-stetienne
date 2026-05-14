@@ -2133,6 +2133,8 @@ async function doSend(){
       if (!statusByEmp[r.emp_name]) statusByEmp[r.emp_name] = [];
       statusByEmp[r.emp_name].push(`${dayLabelsExport[r.day_index]}: ${code}`);
     });
+    console.log('statusRows:', statusRows.length, 'statusByEmp:', JSON.stringify(statusByEmp));
+    console.log('SEMAINE_ROWS Philippe:', SEMAINE_ROWS['Philippe Girard']);
 
     // Écrire notes : col Y (index 24) dans Semaine, col X (index 23) dans Heures
     Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
