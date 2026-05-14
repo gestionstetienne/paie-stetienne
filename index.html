@@ -1507,12 +1507,13 @@ function delSeg(dayIdx,si) {
   const segs=getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
   segs.splice(si,1); setEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx,segs);
   renderSegs(dayIdx,false); updateDaySummary(dayIdx); updateDayBadge(dayIdx); updateSummary();
-  // Si plus aucun segment réel, réafficher le sélecteur de statut
-  const hasRealSegs = segs.some(s => s.entree || s.sortie || s.dentist);
-  if (!hasRealSegs) {
+  // Après le rendu, vérifier s'il faut réafficher le sélecteur de statut
+  setTimeout(() => {
+    const segsAfter = getEmpDaySegs(currentPeriodIndex,currentEmployee,dayIdx);
+    const hasRealSegs = segsAfter.some(s => s.entree || s.sortie || s.dentist);
     const statusDiv = document.querySelector(`#db_${dayIdx} .status-selector`);
-    if (statusDiv) statusDiv.style.display = '';
-  }
+    if (statusDiv) statusDiv.style.display = hasRealSegs ? 'none' : '';
+  }, 0);
 }
 
 function updSeg(dayIdx,si,field,value) {
