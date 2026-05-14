@@ -2142,8 +2142,13 @@ async function doSend(){
       const comments = statusByEmp[empName];
       if (comments && comments.length > 0) {
         const comment = comments.join(' | ');
-        writeTextCell(wsSemaine, row, 24, comment); // col Y onglet Semaine
-        writeTextCell(wsHeures,  row, 23, comment); // col X onglet Heures
+        console.log(`Écriture note: ${empName} row=${row} col=24 comment="${comment}"`);
+        const refY = XLSX.utils.encode_cell({ r: row - 1, c: 24 });
+        const refX = XLSX.utils.encode_cell({ r: row - 1, c: 23 });
+        console.log(`  Semaine[${refY}] avant:`, wsSemaine[refY]);
+        writeTextCell(wsSemaine, row, 24, comment);
+        writeTextCell(wsHeures,  row, 23, comment);
+        console.log(`  Semaine[${refY}] après:`, wsSemaine[refY]);
       }
     });
 
