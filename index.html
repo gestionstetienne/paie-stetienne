@@ -820,6 +820,14 @@ async function loadEmpPeriod(pi, empName) {
     if (rows.length > 0) {
       const data = {};
       rows.forEach(r => {
+        // seg_index=99 = statut de journée, pas un vrai segment
+        if (r.seg_index === 99) {
+          if (r.day_status) {
+            const sk = `status_${pi}_${empName}_${r.day_index}`;
+            localStorage.setItem(sk, r.day_status);
+          }
+          return; // Ne pas ajouter aux segments
+        }
         if (!data[r.day_index]) data[r.day_index] = [];
         while (data[r.day_index].length <= r.seg_index)
           data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
@@ -1366,21 +1374,44 @@ function buildStatusSelector(dayIdx, currentStatus, segsExist) {
 }
 
 function getDayStatus(dayIdx) {
+  // Lire depuis le cache local d'abord
   const k = `status_${currentPeriodIndex}_${currentEmployee}_${dayIdx}`;
   return localStorage.getItem(k) || '';
 }
 
 async function setDayStatus(dayIdx, status) {
   const k = `status_${currentPeriodIndex}_${currentEmployee}_${dayIdx}`;
+
   if (status === '') {
     localStorage.removeItem(k);
-    // Ouvrir le sélecteur de segment
+    // Supprimer le statut dans Supabase (insérer une ligne avec day_status null)
+    try {
+      await sbFetch(`saisies?periode_index=eq.${currentPeriodIndex}&emp_name=eq.${encodeURIComponent(currentEmployee)}&day_index=eq.${dayIdx}&seg_index=eq.99`,
+        { method:'DELETE', prefer:'' });
+    } catch(e) { console.warn('setDayStatus delete:', e); }
     addSeg(dayIdx);
   } else {
     localStorage.setItem(k, status);
     // Effacer les segments si un statut est choisi
     setEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx, []);
+    // Sauvegarder le statut dans Supabase via une ligne spéciale seg_index=99
+    try {
+      await sbFetch('saisies?on_conflict=periode_index,emp_name,day_index,seg_index', {
+        method: 'POST',
+        prefer: 'return=minimal,resolution=merge-duplicates',
+        body: JSON.stringify([{
+          periode_index: currentPeriodIndex,
+          emp_name: currentEmployee,
+          day_index: dayIdx,
+          seg_index: 99, // Index spécial pour les statuts
+          entree: null, sortie: null, pause: 0, dentist: null,
+          day_status: status,
+          updated_at: new Date().toISOString()
+        }])
+      });
+    } catch(e) { console.warn('setDayStatus save:', e); }
   }
+
   // Reconstruire la journée
   const p = getPeriod(currentPeriodIndex);
   const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
@@ -2053,20 +2084,38 @@ async function doSend(){
     }
 
     // Labels courts des statuts pour l'export Excel
-    const STATUS_LABELS = {
-      'vacances': 'VB',
-      'ferie': 'JF',
-      'maladie': 'MB',
-      'absent_sans_solde': 'ASS',
-      'ne_travaille_pas': ''
-    };
+    // ── Colonne Y (index 24) — En-têtes commentaires (onglet Semaine) ──
+    writeTextCell(wsSemaine, 2, 24, 'Commentaires');
+    writeTextCell(wsSemaine, 3, 24, 'Statut / Absence');
 
-    // Insérer dans Semaine
-    Object.entries(data.Semaine).forEach(([rowStr, cols]) => {
-      const row = parseInt(rowStr);
-      Object.entries(cols).forEach(([colIdx, val]) => {
-        if (val && val > 0) writeCell(wsSemaine, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
-      });
+    // ── Lire les statuts depuis Supabase (seg_index=99) ──
+    let statusRows = [];
+    try {
+      statusRows = await sbFetch(`saisies?periode_index=eq.${currentPeriodIndex}&seg_index=eq.99`);
+    } catch(e) { console.warn('Could not load statuses:', e); }
+
+    const STATUS_LABELS_EXPORT = {
+      'vacances': 'VB', 'ferie': 'JF', 'maladie': 'MB', 'absent_sans_solde': 'ASS'
+    };
+    const dayLabelsExport = ['Lun S1','Mar S1','Mer S1','Jeu S1','Ven S1','Lun S2','Mar S2','Mer S2','Jeu S2','Ven S2'];
+
+    const statusByEmp = {};
+    statusRows.forEach(r => {
+      if (!r.day_status || r.day_status === 'ne_travaille_pas') return;
+      const code = STATUS_LABELS_EXPORT[r.day_status];
+      if (!code) return;
+      if (!statusByEmp[r.emp_name]) statusByEmp[r.emp_name] = [];
+      statusByEmp[r.emp_name].push(`${dayLabelsExport[r.day_index]}: ${code}`);
+    });
+
+    Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
+      if (empName.includes('2e soir')) return;
+      const comments = statusByEmp[empName];
+      if (comments && comments.length > 0) {
+        const comment = comments.join(' | ');
+        writeTextCell(wsSemaine, row, 24, comment);
+        writeTextCell(wsHeures,  row, 23, comment);
+      }
     });
 
     // Insérer dans Heures
