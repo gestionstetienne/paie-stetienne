@@ -1293,13 +1293,24 @@ function buildDayCard(dayIdx,dateObj,locked) {
   const today=new Date(); today.setHours(0,0,0,0);
   const isToday=dateObj.getTime()===today.getTime();
   const total=getDayTotal(dayIdx);
+  const status=getDayStatus(dayIdx);
   const card=document.createElement('div');
   card.className='day-card'+(locked?' locked':''); card.id=`dc_${dayIdx}`;
+
+  // Badge statut dans l'en-tête
+  let statusBadge='';
+  if(status==='vacances') statusBadge='<span style="font-size:10px;background:#DBEAFE;color:#1D4ED8;padding:2px 7px;border-radius:10px;font-weight:600">🏖 Vacances</span>';
+  else if(status==='ne_travaille_pas') statusBadge='<span style="font-size:10px;background:#F3F4F6;color:#6B7A99;padding:2px 7px;border-radius:10px;font-weight:600">— Ne travaille pas</span>';
+  else if(status==='ferie') statusBadge='<span style="font-size:10px;background:#FEF3C7;color:#D97706;padding:2px 7px;border-radius:10px;font-weight:600">🎉 Jour férié</span>';
+  else if(status==='maladie') statusBadge='<span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:2px 7px;border-radius:10px;font-weight:600">🤒 Maladie</span>';
+  else if(status==='absent_sans_solde') statusBadge='<span style="font-size:10px;background:#F3F4F6;color:#374151;padding:2px 7px;border-radius:10px;font-weight:600">🚫 Absent sans solde</span>';
+
   card.innerHTML=`
     <div class="day-hdr" onclick="toggleDay(${dayIdx})">
       <div class="day-info">
         <span class="day-name">${dayName}${isToday?' <span style="font-size:10px;color:var(--ok)">●</span>':''}</span>
         <span class="day-meta">Sem ${w} · ${dateObj.toLocaleDateString('fr-CA',{day:'2-digit',month:'long'})}</span>
+        ${statusBadge}
       </div>
       <div class="day-right">
         <span class="day-total${total>0?' active':''}" id="dtb_${dayIdx}">${total>0?fmtH(total):'—'}</span>
@@ -1307,13 +1318,58 @@ function buildDayCard(dayIdx,dateObj,locked) {
       </div>
     </div>
     <div class="day-body" id="db_${dayIdx}">
+      ${locked?'':buildStatusSelector(dayIdx, status)}
       <div class="segs" id="segs_${dayIdx}"></div>
-      ${locked?'':
+      ${locked||status?'':
         `<button class="add-seg-btn" onclick="addSeg(${dayIdx})">+ Ajouter une entrée / sortie</button>`}
       <div class="day-sum" id="ds_${dayIdx}"></div>
     </div>`;
   setTimeout(()=>{ renderSegs(dayIdx,locked); updateDaySummary(dayIdx); if(isToday) toggleDay(dayIdx,true); },0);
   return card;
+}
+
+function buildStatusSelector(dayIdx, currentStatus) {
+  const opts = [
+    {v:'', label:'+ Ajouter des heures / sélectionner un statut'},
+    {v:'ne_travaille_pas', label:'— Ne travaille pas cette journée'},
+    {v:'vacances', label:'🏖  Vacances / congé à payer (banque)'},
+    {v:'ferie', label:'🎉  Jour férié'},
+    {v:'maladie', label:'🤒  Maladie / absence à payer (banque)'},
+    {v:'absent_sans_solde', label:'🚫  Absent sans solde'},
+  ];
+  return `<div style="margin-bottom:10px">
+    <select onchange="setDayStatus(${dayIdx},this.value)"
+      style="width:100%;padding:9px 12px;border:1.5px solid ${currentStatus?'var(--navy)':'var(--border)'};
+        border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;
+        background:${currentStatus?'#EBF2FB':'var(--surface)'};color:var(--text);cursor:pointer">
+      ${opts.map(o=>`<option value="${o.v}" ${currentStatus===o.v?'selected':''}>${o.label}</option>`).join('')}
+    </select>
+  </div>`;
+}
+
+function getDayStatus(dayIdx) {
+  const k = `status_${currentPeriodIndex}_${currentEmployee}_${dayIdx}`;
+  return localStorage.getItem(k) || '';
+}
+
+async function setDayStatus(dayIdx, status) {
+  const k = `status_${currentPeriodIndex}_${currentEmployee}_${dayIdx}`;
+  if (status === '') {
+    localStorage.removeItem(k);
+    // Ouvrir le sélecteur de segment
+    addSeg(dayIdx);
+  } else {
+    localStorage.setItem(k, status);
+    // Effacer les segments si un statut est choisi
+    setEmpDaySegs(currentPeriodIndex, currentEmployee, dayIdx, []);
+  }
+  // Reconstruire la journée
+  const p = getPeriod(currentPeriodIndex);
+  const locked = isLocked(currentPeriodIndex) || isSent(currentPeriodIndex);
+  const old = document.getElementById(`dc_${dayIdx}`);
+  if (old) old.replaceWith(buildDayCard(dayIdx, p.days[dayIdx], locked));
+  toggleDay(dayIdx, true);
+  updateSummary();
 }
 
 function toggleDay(i,forceOpen) {
@@ -1657,12 +1713,28 @@ async function showApercu() {
     });
 
     empsWithout.forEach(emp=>{
+      // Vérifier si toutes les journées ont un statut (vacances, férié, etc.)
+      let allStatusSet = true;
+      for(let i=0;i<10;i++){
+        const segs=getEmpDaySegs(currentPeriodIndex,emp.name,i);
+        const status=localStorage.getItem(`status_${currentPeriodIndex}_${emp.name}_${i}`);
+        if(!status && !segs.length) { allStatusSet=false; break; }
+      }
       const tr=document.createElement('tr');
-      tr.style.background='#FEF2F2';
-      tr.innerHTML='<td style="text-align:left;color:#DC2626">'+emp.name+'</td>'+
-        '<td style="color:'+((catColors[emp.cat])||'#666')+';font-size:11px">'+emp.cat+'</td>'+
-        '<td>—</td><td>—</td><td>—</td>'+
-        '<td><span style="color:#DC2626;font-size:11px;font-weight:700">⚠ Manquant</span></td>';
+      if(allStatusSet){
+        // Toutes les journées ont un statut — afficher en gris, pas en rouge
+        tr.style.background='#F9FAFB';
+        tr.innerHTML='<td style="text-align:left;color:var(--muted)">'+emp.name+'</td>'+
+          '<td style="color:'+((catColors[emp.cat])||'#666')+';font-size:11px">'+emp.cat+'</td>'+
+          '<td>—</td><td>—</td><td>—</td>'+
+          '<td><span style="color:var(--muted);font-size:11px">✓ Statut indiqué</span></td>';
+      } else {
+        tr.style.background='#FEF2F2';
+        tr.innerHTML='<td style="text-align:left;color:#DC2626">'+emp.name+'</td>'+
+          '<td style="color:'+((catColors[emp.cat])||'#666')+';font-size:11px">'+emp.cat+'</td>'+
+          '<td>—</td><td>—</td><td>—</td>'+
+          '<td><span style="color:#DC2626;font-size:11px;font-weight:700">⚠ Manquant</span></td>';
+      }
       tbody.appendChild(tr);
     });
 
@@ -1920,7 +1992,7 @@ async function doSend(){
     // Construire les données par employée
     const data = buildXlsxData(currentPeriodIndex);
 
-    // Fonction pour écrire une valeur dans une cellule
+    // Fonction pour écrire une valeur numérique dans une cellule
     function writeCell(ws, row, colIdx, value) {
       const cellRef = XLSX.utils.encode_cell({ r: row - 1, c: colIdx });
       if (!ws[cellRef]) ws[cellRef] = {};
@@ -1928,6 +2000,21 @@ async function doSend(){
       ws[cellRef].t = 'n';
       if (!ws[cellRef].z) ws[cellRef].z = '#,##0.00';
     }
+
+    // Fonction pour écrire du texte dans une cellule
+    function writeTextCell(ws, row, colIdx, value) {
+      const cellRef = XLSX.utils.encode_cell({ r: row - 1, c: colIdx });
+      ws[cellRef] = { v: value, t: 's' };
+    }
+
+    // Labels des statuts
+    const STATUS_LABELS = {
+      'vacances': 'Vacances/congé à payer',
+      'ferie': 'Jour férié',
+      'maladie': 'Maladie/absence à payer',
+      'absent_sans_solde': 'Absent sans solde',
+      'ne_travaille_pas': 'Ne travaille pas'
+    };
 
     // Insérer dans Semaine
     Object.entries(data.Semaine).forEach(([rowStr, cols]) => {
@@ -1943,6 +2030,29 @@ async function doSend(){
       Object.entries(cols).forEach(([colIdx, val]) => {
         if (val && val > 0) writeCell(wsHeures, row, parseInt(colIdx) - 1, Math.round(val * 100) / 100);
       });
+    });
+
+    // ── Colonne Y (index 24) — En-têtes commentaires (onglet Semaine) ──
+    writeTextCell(wsSemaine, 2, 24, 'Commentaires');
+    writeTextCell(wsSemaine, 3, 24, 'Statut / Absence');
+
+    // ── Colonne Y — Statuts des journées pour chaque employée (onglet Semaine) ──
+    // ── Colonne X (index 23) — Statuts dans "Note" (onglet Heures et proportions) ──
+    Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
+      if (empName.includes('2e soir')) return;
+      const comments = [];
+      const dayLabels = ['Lun S1','Mar S1','Mer S1','Jeu S1','Ven S1','Lun S2','Mar S2','Mer S2','Jeu S2','Ven S2'];
+      for (let i = 0; i < 10; i++) {
+        const status = localStorage.getItem(`status_${currentPeriodIndex}_${empName}_${i}`);
+        if (status && STATUS_LABELS[status]) {
+          comments.push(`${dayLabels[i]}: ${STATUS_LABELS[status]}`);
+        }
+      }
+      if (comments.length > 0) {
+        const comment = comments.join(' | ');
+        writeTextCell(wsSemaine, row, 24, comment);   // col Y dans Semaine
+        writeTextCell(wsHeures,  row, 23, comment);   // col X (Note) dans Heures
+      }
     });
 
     // Générer le fichier final
