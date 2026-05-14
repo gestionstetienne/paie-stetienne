@@ -2013,13 +2013,13 @@ async function doSend(){
       ws[cellRef] = { v: value, t: 's' };
     }
 
-    // Labels des statuts
+    // Labels courts des statuts pour l'export Excel
     const STATUS_LABELS = {
-      'vacances': 'Vacances/congé à payer',
-      'ferie': 'Jour férié',
-      'maladie': 'Maladie/absence à payer',
-      'absent_sans_solde': 'Absent sans solde',
-      'ne_travaille_pas': 'Ne travaille pas'
+      'vacances': 'VB',
+      'ferie': 'JF',
+      'maladie': 'MB',
+      'absent_sans_solde': 'ASS',
+      'ne_travaille_pas': ''
     };
 
     // Insérer dans Semaine
@@ -2050,7 +2050,7 @@ async function doSend(){
       const dayLabels = ['Lun S1','Mar S1','Mer S1','Jeu S1','Ven S1','Lun S2','Mar S2','Mer S2','Jeu S2','Ven S2'];
       for (let i = 0; i < 10; i++) {
         const status = localStorage.getItem(`status_${currentPeriodIndex}_${empName}_${i}`);
-        if (status && STATUS_LABELS[status]) {
+        if (status && STATUS_LABELS[status] && status !== 'ne_travaille_pas') {
           comments.push(`${dayLabels[i]}: ${STATUS_LABELS[status]}`);
         }
       }
