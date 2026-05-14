@@ -2136,6 +2136,13 @@ async function doSend(){
     console.log('statusRows:', statusRows.length, 'statusByEmp:', JSON.stringify(statusByEmp));
     console.log('SEMAINE_ROWS Philippe:', SEMAINE_ROWS['Philippe Girard']);
 
+    // Test direct pour Philippe Girard
+    if (statusByEmp['Philippe Girard']) {
+      console.log('Philippe Girard a des notes - écriture directe');
+      writeTextCell(wsSemaine, 18, 24, statusByEmp['Philippe Girard'].join(' | '));
+      writeTextCell(wsHeures, 18, 23, statusByEmp['Philippe Girard'].join(' | '));
+    }
+
     // Écrire notes : col Y (index 24) dans Semaine, col X (index 23) dans Heures
     Object.entries(SEMAINE_ROWS).forEach(([empName, row]) => {
       if (empName.includes('2e soir')) return;
