@@ -1679,7 +1679,7 @@ function updateSummary(){
   }
   const tfoot=document.getElementById('sumTfoot');
   tfoot.innerHTML=`<td>TOTAL</td>${dentists.map(d=>`<td>${totals[d.key]>0?fmtH(totals[d.key]):'—'}</td>`).join('')}<td></td><td>${grand>0?fmtH(grand):'—'}</td>`;
-  document.getElementById('weekSummary').style.display=grand>0?'block':'none';
+  document.getElementById('weekSummary').style.display='block';
 }
 
 // ═══════════════════════════════════════════════════════════════
