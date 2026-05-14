@@ -870,8 +870,9 @@ async function syncDay(pi, empName, di, segs) {
   try {
     if (completeSegs.length === 0) {
       // Supprimer les anciens segments de cette journée dans Supabase
+      // MAIS garder seg_index=99 qui contient le statut de la journée
       await sbFetch(
-        `saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}`,
+        `saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}&seg_index=neq.99`,
         { method:'DELETE', prefer:'' }
       );
     } else {
@@ -891,9 +892,9 @@ async function syncDay(pi, empName, di, segs) {
         method: 'POST',
         body:   JSON.stringify(rows)
       });
-      // Supprimer les anciens segments en excès
+      // Supprimer les anciens segments en excès (mais pas seg_index=99)
       await sbFetch(
-        `saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}&seg_index=gte.${completeSegs.length}`,
+        `saisies?periode_index=eq.${pi}&emp_name=eq.${encodeURIComponent(empName)}&day_index=eq.${di}&seg_index=gte.${completeSegs.length}&seg_index=neq.99`,
         { method:'DELETE', prefer:'' }
       );
     }
