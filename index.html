@@ -1706,12 +1706,15 @@ async function showApercu() {
   const p = getPeriod(currentPeriodIndex);
 
 
-  showLoadingOverlay('Preparation de l\'apercu...');
+  showLoadingOverlay('Préparation de l\'aperçu…');
   if (isAdmin) {
-    // Admin — charger toutes les donnees depuis Supabase
+    // Admin — charger toutes les données depuis Supabase
     await loadAllPeriodSupabaseOnly(currentPeriodIndex);
+  } else {
+    // Employée — forcer rechargement depuis Supabase
+    delete _cache[ck(currentPeriodIndex, currentEmployee)];
+    await loadEmpPeriod(currentPeriodIndex, currentEmployee);
   }
-  // Employe — utiliser ses propres donnees en cache, ne pas ecraser le cache global
   hideLoadingOverlay();
   const errDiv=document.getElementById('apercuErrors');
   const errOk=document.getElementById('apercuOk');
