@@ -1138,76 +1138,31 @@ async function showApp() {
   initColorPicker();
 
 
-  // Charger les données — localStorage d'abord, puis Supabase en arrière-plan
+  // À la connexion — vider TOUT le cache et localStorage des autres employées
+  // pour s'assurer qu'on ne voit que ses propres données
   showLoadingOverlay('Chargement de vos données…');
 
-  // 1. Charger immédiatement depuis localStorage (instantané)
-  [currentPeriodIndex, currentPeriodIndex - 1].forEach(pi => {
-    if (pi < 0) return;
-    [currentEmployee].forEach(empName => {
-      const k = ck(pi, empName);
-      if (!_cache[k]) {
-        try {
-          const local = JSON.parse(localStorage.getItem(`paie_${k}`));
-          if (local && Object.keys(local).length > 0) _cache[k] = local;
-        } catch(e) {}
-      }
-    });
+  // Vider le cache mémoire complet
+  Object.keys(_cache).forEach(k => { delete _cache[k]; });
+
+  // Vider les données paie du localStorage (garder config et statuts de l'employée courante)
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith('paie_p') && !k.includes(currentEmployee)) {
+      localStorage.removeItem(k);
+    }
+    // Supprimer les statuts des autres employées
+    if (k.startsWith('status_') && !k.includes('_' + currentEmployee + '_')) {
+      localStorage.removeItem(k);
+    }
   });
 
+  // Charger uniquement depuis Supabase pour l'employée courante
+  await loadEmpPeriod(currentPeriodIndex, currentEmployee);
+  if (currentPeriodIndex > 0) await loadEmpPeriod(currentPeriodIndex - 1, currentEmployee);
+
   hideLoadingOverlay();
-  renderDays(); // Afficher immédiatement avec données locales
+  renderDays();
   document.getElementById('actionsBar').style.display = 'flex';
-
-  // 2. Synchroniser avec Supabase en arrière-plan (sans bloquer l'affichage)
-  (async () => {
-    try {
-      const rows = await sbFetch(
-        `saisies?periode_index=eq.${currentPeriodIndex}&emp_name=eq.${encodeURIComponent(currentEmployee)}&order=day_index,seg_index`
-      );
-      if (rows.length > 0) {
-        // Supabase a des données — les utiliser seulement si plus récentes
-        const data = {};
-        rows.forEach(r => {
-          if (r.seg_index === 99) {
-            // Statut de journée — sauvegarder dans localStorage
-            if (r.day_status) {
-              const sk = `status_${currentPeriodIndex}_${currentEmployee}_${r.day_index}`;
-              localStorage.setItem(sk, r.day_status);
-            }
-            return;
-          }
-          if (!data[r.day_index]) data[r.day_index] = [];
-          while (data[r.day_index].length <= r.seg_index)
-            data[r.day_index].push({entree:'',sortie:'',pause:'0',dentist:'',is2eSoir:false});
-          data[r.day_index][r.seg_index] = {
-            entree:r.entree||'', sortie:r.sortie||'',
-            pause:String(r.pause||0), dentist:r.dentist||'',
-            is2eSoir:r.is_2e_soir||false
-          };
-        });
-        _cache[ck(currentPeriodIndex, currentEmployee)] = data;
-        // Mettre à jour localStorage aussi
-        try { localStorage.setItem(`paie_${ck(currentPeriodIndex, currentEmployee)}`, JSON.stringify(data)); } catch(e) {}
-        renderDays(); // Rafraîchir avec données Supabase
-      } else {
-        // Supabase vide — synchoniser les données locales vers Supabase
-        const localData = _cache[ck(currentPeriodIndex, currentEmployee)];
-        if (localData) {
-          for (const dayIdx of Object.keys(localData)) {
-            const segs = localData[dayIdx];
-            if (segs && segs.length > 0) {
-              await syncDay(currentPeriodIndex, currentEmployee, parseInt(dayIdx), segs);
-            }
-          }
-          setSync('✓ Données synchronisées', true);
-        }
-      }
-    } catch(e) {
-      console.warn('Sync Supabase en arrière-plan échouée:', e);
-    }
-  })();
-
   checkScheduled();
   renderDays();
   document.getElementById('actionsBar').style.display = 'flex';
@@ -1740,10 +1695,14 @@ async function showApercu() {
   if(!currentEmployee) return;
   const p = getPeriod(currentPeriodIndex);
 
-  showLoadingOverlay('Preparation de l\'apercu...');
-  await loadAllPeriodSupabaseOnly(currentPeriodIndex);
-  hideLoadingOverlay();
 
+  showLoadingOverlay('Preparation de l\'apercu...');
+  if (isAdmin) {
+    // Admin — charger toutes les donnees depuis Supabase
+    await loadAllPeriodSupabaseOnly(currentPeriodIndex);
+  }
+  // Employe — utiliser ses propres donnees en cache, ne pas ecraser le cache global
+  hideLoadingOverlay();
   const errDiv=document.getElementById('apercuErrors');
   const errOk=document.getElementById('apercuOk');
   const thead=document.getElementById('apercuThead');
