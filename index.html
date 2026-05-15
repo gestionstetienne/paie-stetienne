@@ -1145,16 +1145,26 @@ async function showApp() {
   // Vider le cache mémoire complet
   Object.keys(_cache).forEach(k => { delete _cache[k]; });
 
-  // Vider les données paie du localStorage (garder config et statuts de l'employée courante)
+  // Vider les données paie et sent_ du localStorage
   Object.keys(localStorage).forEach(k => {
     if (k.startsWith('paie_p') && !k.includes(currentEmployee)) {
       localStorage.removeItem(k);
     }
-    // Supprimer les statuts des autres employées
     if (k.startsWith('status_') && !k.includes('_' + currentEmployee + '_')) {
       localStorage.removeItem(k);
     }
+    // Vider les périodes envoyées — toujours recharger depuis Supabase
+    if (k.startsWith('sent_')) {
+      localStorage.removeItem(k);
+    }
   });
+
+  // Recharger les périodes envoyées depuis Supabase
+  try {
+    const sentRows = await sbFetch('periodes_envoyees');
+    sentRows.forEach(r => localStorage.setItem(`sent_${r.periode_index}`,
+      JSON.stringify({sentAt: r.sent_at, email: r.email})));
+  } catch(e) { console.warn('Could not load sent periods:', e); }
 
   // Charger uniquement depuis Supabase pour l'employée courante
   await loadEmpPeriod(currentPeriodIndex, currentEmployee);
