@@ -278,7 +278,7 @@ header {
 .modal-btns { display:flex; gap:8px; justify-content:flex-end; }
 
 /* ── APERÇU ── */
-.apercu-modal { max-width:680px !important; max-height:88vh; overflow-y:auto; }
+.apercu-modal { max-width:780px !important; max-height:88vh; overflow-y:auto; }
 .section-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
   color:var(--muted); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border);
   display:flex; align-items:center; gap:7px; }
@@ -1834,7 +1834,9 @@ async function showApercu() {
 
     document.getElementById('apercuPeriodLabel').textContent=fmtDate(p.start,true)+' au '+fmtDate(p.end);
     const activeDents=dentists.filter(d=>{let t=0;for(let i=0;i<10;i++)getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{const v=validate(s);if(v.valid&&s.dentist===d.key)t+=v.hrs;});return t>0;});
-    thead.innerHTML='<th style="text-align:left">Journee</th>'+activeDents.map(d=>'<th>'+d.short+'</th>').join('')+'<th>Total</th>';
+    thead.innerHTML='<th style="text-align:left;min-width:120px">Journée</th>'+
+      activeDents.map(d=>'<th style="min-width:80px;white-space:nowrap">'+d.short+'</th>').join('')+
+      '<th style="min-width:70px">Total</th>';
     tbody.innerHTML='';
     const curTotals={};let curGrand=0;
     for(let i=0;i<10;i++){
