@@ -1847,7 +1847,7 @@ async function showApercu() {
       const w=i<5?1:2;
       const tr=document.createElement('tr');
       tr.innerHTML='<td style="text-align:left;position:sticky;left:0;background:var(--surface)"><strong>'+DAYS_FR[i%5]+'</strong> <span style="color:var(--muted);font-size:10px">S'+w+' '+p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})+'</span></td>'+
-        activeDents.map(d=>{const h=byD[d.key]||0;return'<td style="color:'+(h>0?'var(--text)':'var(--light)')+'>'+(h>0?fmtH(h):'—')+'</td>';}).join('')+
+        activeDents.map(d=>{const h=byD[d.key]||0;return'<td style="text-align:center;font-weight:'+(h>0?'700':'400')+';color:'+(h>0?'var(--navy)':'#CDD5E0')+';font-family:monospace">'+(h>0?fmtH(h):'—')+'</td>';}).join('')+
         '<td style="position:sticky;right:0;background:var(--surface);font-weight:700">'+(dt>0?fmtH(dt):'—')+'</td>';
       tbody.appendChild(tr);
     }
