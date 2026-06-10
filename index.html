@@ -1649,8 +1649,18 @@ function revalSeg(dayIdx, si) {
   revalDay(dayIdx);
   updateDaySummary(dayIdx);
 }
-function getDayTotal(di){return getEmpDaySegs(currentPeriodIndex,currentEmployee,di).reduce((s,seg)=>s+(validate(seg).hrs||0),0);}
-function getDayByDentist(di){const r={};getEmpDaySegs(currentPeriodIndex,currentEmployee,di).forEach(seg=>{const v=validate(seg);if(v.valid&&seg.dentist)r[seg.dentist]=(r[seg.dentist]||0)+v.hrs;});return r;}
+function getDayTotal(di){
+  return getEmpDaySegs(currentPeriodIndex,currentEmployee,di)
+    .reduce((s,seg)=>{const v=validate(seg); return s+(v.valid?v.hrs:0);},0);
+}
+function getDayByDentist(di){
+  const r={};
+  getEmpDaySegs(currentPeriodIndex,currentEmployee,di).forEach(seg=>{
+    const v=validate(seg);
+    if(v.valid&&seg.dentist) r[seg.dentist]=(r[seg.dentist]||0)+v.hrs;
+  });
+  return r;
+}
 
 // ── UI updates ──
 function updateDayBadge(di){const b=document.getElementById(`dtb_${di}`);if(!b)return;const t=getDayTotal(di);b.textContent=t>0?fmtH(t):'—';b.className=t>0?'day-total active':'day-total';}
