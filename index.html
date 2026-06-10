@@ -279,6 +279,8 @@ header {
 
 /* ── APERÇU ── */
 .apercu-modal { max-width:780px !important; max-height:88vh; overflow-y:auto; }
+.apercu-table-wrap { overflow-x:auto; width:100%; }
+.apercu-table-wrap table { min-width:100%; white-space:nowrap; }
 .section-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
   color:var(--muted); margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border);
   display:flex; align-items:center; gap:7px; }
@@ -637,8 +639,8 @@ optgroup { font-weight:700; font-style:normal; }
       ✓ Toutes les entrées sont complètes et valides.
     </div>
     <div class="section-lbl"><span class="num">2</span> Période courante — <span id="apercuPeriodLabel"></span></div>
-    <div class="sum-table-wrap">
-      <table class="sum-table" style="min-width:380px">
+    <div class="apercu-table-wrap">
+      <table class="sum-table">
         <thead><tr id="apercuThead"></tr></thead>
         <tbody id="apercuTbody"></tbody>
         <tfoot><tr id="apercuTfoot" style="font-weight:700;background:var(--surf2)"></tr></tfoot>
@@ -1834,9 +1836,9 @@ async function showApercu() {
 
     document.getElementById('apercuPeriodLabel').textContent=fmtDate(p.start,true)+' au '+fmtDate(p.end);
     const activeDents=dentists.filter(d=>{let t=0;for(let i=0;i<10;i++)getEmpDaySegs(currentPeriodIndex,currentEmployee,i).forEach(s=>{const v=validate(s);if(v.valid&&s.dentist===d.key)t+=v.hrs;});return t>0;});
-    thead.innerHTML='<th style="text-align:left;min-width:120px">Journée</th>'+
-      activeDents.map(d=>'<th style="min-width:80px;white-space:nowrap">'+d.short+'</th>').join('')+
-      '<th style="min-width:70px">Total</th>';
+    thead.innerHTML='<th style="text-align:left;min-width:130px;position:sticky;left:0;background:var(--navy2);z-index:1">Journée</th>'+
+      activeDents.map(d=>'<th style="min-width:90px;white-space:nowrap">'+d.short+'</th>').join('')+
+      '<th style="min-width:75px;position:sticky;right:0;background:var(--navy2);z-index:1">Total</th>';
     tbody.innerHTML='';
     const curTotals={};let curGrand=0;
     for(let i=0;i<10;i++){
@@ -1844,9 +1846,9 @@ async function showApercu() {
       activeDents.forEach(d=>curTotals[d.key]=(curTotals[d.key]||0)+(byD[d.key]||0));
       const w=i<5?1:2;
       const tr=document.createElement('tr');
-      tr.innerHTML='<td style="text-align:left"><strong>'+DAYS_FR[i%5]+'</strong> <span style="color:var(--muted);font-size:10px">S'+w+' '+p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})+'</span></td>'+
+      tr.innerHTML='<td style="text-align:left;position:sticky;left:0;background:var(--surface)"><strong>'+DAYS_FR[i%5]+'</strong> <span style="color:var(--muted);font-size:10px">S'+w+' '+p.days[i].toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})+'</span></td>'+
         activeDents.map(d=>{const h=byD[d.key]||0;return'<td style="color:'+(h>0?'var(--text)':'var(--light)')+'>'+(h>0?fmtH(h):'—')+'</td>';}).join('')+
-        '<td><strong>'+(dt>0?fmtH(dt):'—')+'</strong></td>';
+        '<td style="position:sticky;right:0;background:var(--surface);font-weight:700">'+(dt>0?fmtH(dt):'—')+'</td>';
       tbody.appendChild(tr);
     }
     tfoot.innerHTML='<td style="text-align:left">TOTAL</td>'+activeDents.map(d=>'<td>'+(curTotals[d.key]>0?fmtH(curTotals[d.key]):'—')+'</td>').join('')+'<td>'+(curGrand>0?fmtH(curGrand):'—')+'</td>';
