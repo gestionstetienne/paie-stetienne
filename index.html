@@ -2179,11 +2179,27 @@ async function doSend(){
 
 
     // ── RÈGLE JOUR FÉRIÉ (hygiénistes seulement) ──
-    // 1) Détecter les jours fériés réels : un jour est considéré férié pour la
-    //    clinique si ≥75% des hygiénistes actives (noms de base, sans "2e soir")
-    //    ont sélectionné le statut "ferie" ce jour-là, n'importe où dans la période.
-    const hygBaseList = employees.filter(e => e.cat === 'Hygiéniste' && !e.name.includes('2e soir'));
+    const hygBaseListAll = employees.filter(e => e.cat === 'Hygiéniste' && !e.name.includes('2e soir'));
+    // Ne compter au dénominateur que les hygiénistes ayant au moins une donnée
+    // pour cette période (heures travaillées ou un statut quelconque), pour
+    // exclure celles entièrement absentes/inactives durant toute la période.
+    const hygBaseList = hygBaseListAll.filter(e => {
+      const hasStatus = statusRows.some(r => r.emp_name.replace(' 2e soir', '').trim() === e.name);
+      if (hasStatus) return true;
+      for (let i = 0; i < 10; i++) {
+        const segs = getEmpDaySegs(currentPeriodIndex, e.name, i);
+        if (segs.some(s => s.entree || s.sortie || s.dentist)) return true;
+      }
+      return false;
+    });
     const totalHyg = hygBaseList.length;
+    // 1) Détecter les jours fériés candidats = tout jour où au moins une
+    //    hygiéniste a sélectionné "Jour férié" (le férié peut tomber un jour
+    //    différent selon l'horaire de chacune).
+    // 2) Valider l'ensemble sur la période complète : le ratio (nombre total de
+    //    sélections "férié") / (nombre d'hygiénistes actives × nombre de jours
+    //    candidats) doit atteindre ≥75% pour que TOUS ces jours soient
+    //    officiellement comptés comme fériés pour la clinique.
     const ferieCountByDay = {};
     statusRows.forEach(r => {
       if (r.day_status !== 'ferie') return;
@@ -2191,10 +2207,13 @@ async function doSend(){
       if (!hygBaseList.find(e => e.name === baseName)) return;
       ferieCountByDay[r.day_index] = (ferieCountByDay[r.day_index] || 0) + 1;
     });
+    const candidateDays = Object.keys(ferieCountByDay).map(Number);
+    const nCandidates = candidateDays.length;
+    const totalSelections = Object.values(ferieCountByDay).reduce((s, c) => s + c, 0);
     const feriesDays = new Set();
-    Object.entries(ferieCountByDay).forEach(([di, count]) => {
-      if (totalHyg > 0 && (count / totalHyg) >= 0.75) feriesDays.add(parseInt(di));
-    });
+    if (totalHyg > 0 && nCandidates > 0 && (totalSelections / (totalHyg * nCandidates)) >= 0.75) {
+      candidateDays.forEach(di => feriesDays.add(di));
+    }
     const nFeries = feriesDays.size;
     const diviseurFerie = 10 - nFeries;
 
