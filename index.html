@@ -2216,6 +2216,11 @@ async function doSend(){
     }
     const nFeries = feriesDays.size;
     const diviseurFerie = 10 - nFeries;
+    console.log('FÉRIÉ DEBUG — hygBaseListAll:', hygBaseListAll.map(e=>e.name));
+    console.log('FÉRIÉ DEBUG — hygBaseList (avec données cette période):', hygBaseList.map(e=>e.name), 'totalHyg:', totalHyg);
+    console.log('FÉRIÉ DEBUG — ferieCountByDay:', JSON.stringify(ferieCountByDay));
+    console.log('FÉRIÉ DEBUG — candidateDays:', candidateDays, 'totalSelections:', totalSelections, 'ratio:', totalHyg>0&&nCandidates>0 ? (totalSelections/(totalHyg*nCandidates)) : 'n/a');
+    console.log('FÉRIÉ DEBUG — feriesDays validés:', Array.from(feriesDays), 'nFeries:', nFeries, 'diviseurFerie:', diviseurFerie);
 
     // 2) Pour chaque ligne hygiéniste (base + 2e soir), calculer les heures
     //    fériées = moyenne des heures réellement travaillées sur les jours
@@ -2246,6 +2251,7 @@ async function doSend(){
       const emp = employees.find(e => e.name === baseName);
       if (!emp || emp.cat !== 'Hygiéniste') return;
       const ferieH = computeFerieHours(empName);
+      console.log('FÉRIÉ DEBUG —', empName, 'row:', row, 'ferieH:', ferieH);
       if (ferieH > 0) writeCell(wsHeures, row, 19, round2(ferieH));
     });
 
@@ -2592,3 +2598,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 </script>
 </body>
 </html>
+
