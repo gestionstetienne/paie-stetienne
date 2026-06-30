@@ -995,6 +995,9 @@ async function markSent(idx) {
         sent_by:currentEmployee
       })
     });
+    // Reverrouiller automatiquement (efface le flag de déverrouillage manuel)
+    await sbFetch(`periodes_deverrouillees?periode_index=eq.${idx}`, { method:'DELETE', prefer:'' });
+    localStorage.removeItem(`unlocked_${idx}`);
   } catch(e) { console.error('markSent error:',e); }
 }
 
@@ -1168,6 +1171,11 @@ async function showApp() {
       JSON.stringify({sentAt: r.sent_at, email: r.email})));
   } catch(e) { console.warn('Could not load sent periods:', e); }
 
+  try {
+    const unlockedRows = await sbFetch('periodes_deverrouillees');
+    unlockedRows.forEach(r => localStorage.setItem(`unlocked_${r.periode_index}`, '1'));
+  } catch(e) { console.warn('Could not load unlocked periods:', e); }
+
   // Charger uniquement depuis Supabase pour l'employée courante
   await loadEmpPeriod(currentPeriodIndex, currentEmployee);
   if (currentPeriodIndex > 0) await loadEmpPeriod(currentPeriodIndex - 1, currentEmployee);
@@ -1216,7 +1224,11 @@ function currentPeriodIdxForNow() {
   return Math.max(0, Math.floor((Date.now()-anchor.getTime())/ms14));
 }
 
-function isLocked(idx) { return Date.now() >= getPeriod(idx).sendDate.getTime(); }
+function isLocked(idx) {
+  if (isManuallyUnlocked(idx)) return false;
+  return Date.now() >= getPeriod(idx).sendDate.getTime();
+}
+function isManuallyUnlocked(idx) { return !!localStorage.getItem(`unlocked_${idx}`); }
 function fmtDate(d,short=false) { return d.toLocaleDateString('fr-CA', short?{day:'2-digit',month:'short'}:{day:'2-digit',month:'short',year:'numeric'}); }
 function fmtTime(d) { return d.toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'}); }
 function fmtH(h) { const hrs=Math.floor(h),m=Math.round((h-hrs)*60); return `${hrs}h${String(m).padStart(2,'0')}`; }
@@ -2408,7 +2420,7 @@ async function unlockPeriod() {
   }
   const periodeIndex = num - 1; // Période 1 = index 0
 
-  if (!confirm(`Déverrouiller la Période ${num} ?\n\nCela permettra de modifier les heures à nouveau.`)) return;
+  if (!confirm(`Déverrouiller la Période ${num} ?\n\nCela permettra de modifier les heures à nouveau.\nAucune heure déjà saisie ne sera effacée.`)) return;
 
   try {
     // Supprimer de Supabase
@@ -2418,6 +2430,14 @@ async function unlockPeriod() {
     );
     // Supprimer du localStorage
     localStorage.removeItem(`sent_${periodeIndex}`);
+
+    // Marquer comme déverrouillée manuellement (contourne la date de verrouillage)
+    await sbFetch('periodes_deverrouillees', {
+      method: 'POST',
+      prefer: 'return=minimal,resolution=merge-duplicates',
+      body: JSON.stringify({ periode_index: periodeIndex, unlocked_by: currentEmployee })
+    });
+    localStorage.setItem(`unlocked_${periodeIndex}`, '1');
 
     toast(`✓ Période ${num} déverrouillée`, 'ok');
     input.value = '';
